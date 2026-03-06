@@ -78,26 +78,55 @@
             color: var(--accent-pink);
         }
 
-        /* ── Shape Tabs ── */
-        .shape-tabs {
+        /* ── Shape Groups ── */
+        .shape-groups {
             display: flex;
             justify-content: center;
-            gap: 8px;
+            gap: 16px;
             padding: 12px 20px;
             flex-wrap: wrap;
         }
 
+        .shape-group {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 8px 12px 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .shape-group-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 4px 6px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .shape-group.prism .shape-group-header { color: var(--accent-blue); }
+        .shape-group.cylinder .shape-group-header { color: var(--accent-green); }
+
+        .shape-group-tabs {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
         .shape-tab {
-            padding: 8px 16px;
+            padding: 7px 14px;
             border-radius: 50px;
             border: 2px solid var(--card-border);
-            background: var(--card-bg);
+            background: rgba(255,255,255,0.04);
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            backdrop-filter: blur(8px);
         }
 
         .shape-tab:hover {
@@ -377,24 +406,38 @@
                 padding: 4px 12px;
             }
 
-            .shape-tabs {
+            .shape-groups {
                 padding: 8px 10px;
-                gap: 6px;
-                flex-wrap: nowrap;
+                gap: 8px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .shape-group {
+                padding: 6px 8px 8px;
+            }
+
+            .shape-group-tabs {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: none;
-                justify-content: flex-start;
+                flex-wrap: nowrap;
             }
 
-            .shape-tabs::-webkit-scrollbar {
+            .shape-group-tabs::-webkit-scrollbar {
                 display: none;
             }
 
             .shape-tab {
-                padding: 6px 12px;
-                font-size: 0.78rem;
+                padding: 6px 11px;
+                font-size: 0.76rem;
                 flex-shrink: 0;
+            }
+
+            .shape-group-header {
+                font-size: 0.68rem;
+                padding-bottom: 4px;
+                margin-bottom: 4px;
             }
 
             .main-container {
@@ -475,8 +518,8 @@
             }
 
             .shape-tab {
-                padding: 5px 10px;
-                font-size: 0.72rem;
+                padding: 5px 9px;
+                font-size: 0.7rem;
             }
         }
     </style>
@@ -489,18 +532,28 @@
         <div class="concept">
             <span class="f-purple">V</span> = <span class="f-yellow">S<sub>đáy</sub></span> × <span
                 class="f-pink">h</span>
-            &nbsp;→&nbsp; luôn đúng với <strong>mọi</strong> hình đáy!
+            &nbsp;→&nbsp; luôn đúng với <strong>mọi</strong> hình đấy!
         </div>
     </div>
 
-    <div class="shape-tabs" id="shape-tabs">
-        <div class="shape-tab active" data-shape="box">📦 Chữ nhật</div>
-        <div class="shape-tab" data-shape="triangle">🔺 Tam giác</div>
-        <div class="shape-tab" data-shape="circle">⭕ Tròn</div>
-        <div class="shape-tab" data-shape="pentagon">⬠ Ngũ giác</div>
-        <div class="shape-tab" data-shape="hexagon">⬡ Lục giác</div>
-        <div class="shape-tab" data-shape="star">⭐ Ngôi sao</div>
-        <div class="shape-tab" data-shape="ellipse">🥚 Elip</div>
+    <div class="shape-groups" id="shape-tabs">
+        <div class="shape-group prism">
+            <div class="shape-group-header">🔷 Hình Lăng Trụ <span style="opacity:0.5;font-weight:400">— đáy đa giác</span></div>
+            <div class="shape-group-tabs">
+                <div class="shape-tab active" data-shape="box">📦 Chữ nhật</div>
+                <div class="shape-tab" data-shape="triangle">🔺 Tam giác</div>
+                <div class="shape-tab" data-shape="pentagon">⬠ Ngũ giác</div>
+                <div class="shape-tab" data-shape="hexagon">⬡ Lục giác</div>
+                <div class="shape-tab" data-shape="star">⭐ Ngôi sao</div>
+            </div>
+        </div>
+        <div class="shape-group cylinder">
+            <div class="shape-group-header">🔵 Hình Trụ <span style="opacity:0.5;font-weight:400">— đáy đường cong</span></div>
+            <div class="shape-group-tabs">
+                <div class="shape-tab" data-shape="circle">⭕ Tròn</div>
+                <div class="shape-tab" data-shape="ellipse">🥚 Elip</div>
+            </div>
+        </div>
     </div>
 
     <div class="main-container">
