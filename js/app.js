@@ -53,7 +53,7 @@ const APP = {
 
     /* ── Route to module ── */
     route() {
-        const hash = window.location.hash.slice(1) || 'phan-so';
+        const hash = window.location.hash.slice(1) || 'on-tap';
         this.loadModule(hash);
     },
 

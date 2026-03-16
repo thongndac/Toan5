@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════
    SỐ THẬP PHÂN — Decimal Module
    Modes: Luyện tập / Đổi số / Đặt tính
-   Uses MATH helper for fraction display
+   Uses MATH helper for fraction display + step-by-step solutions
    ════════════════════════════════════════════ */
 (() => {
     let mode = 'practice', score = 0, streak = 0, bestStreak = 0;
@@ -60,7 +60,10 @@
             </div>`;
         newQuestion(box);
         box.querySelector('#tp-check').addEventListener('click', () => checkAnswer(box));
-        box.querySelector('#tp-skip').addEventListener('click', () => newQuestion(box));
+        box.querySelector('#tp-skip').addEventListener('click', () => {
+            showSolution(box.querySelector('#tp-feedback'), currentQ, true);
+            setTimeout(() => newQuestion(box), 2000);
+        });
         box.querySelector('#tp-answer').addEventListener('keydown', e => { if (e.key === 'Enter') checkAnswer(box); });
     }
 
@@ -90,6 +93,51 @@
         box.querySelector('#tp-feedback').innerHTML = '';
     }
 
+    /** Build step-by-step solution HTML */
+    function buildSolution(q) {
+        const { a, b, op, ans } = q;
+        let steps = '';
+        steps += MATH.step(1, MATH.expr(MATH.txt('Phép tính:'), MATH.val(a), MATH.op(op), MATH.val(b)));
+
+        if (op === '+' || op === '-') {
+            // Align decimals
+            const dA = (a.toString().split('.')[1] || '').length;
+            const dB = (b.toString().split('.')[1] || '').length;
+            const maxD = Math.max(dA, dB);
+            steps += MATH.step(2, MATH.expr(MATH.txt('Viết thẳng dấu phẩy, ' + (op === '+' ? 'cộng' : 'trừ') + ' từ phải sang trái')));
+            steps += MATH.step(3, MATH.expr(
+                MATH.val(a.toFixed(maxD)), MATH.op(op), MATH.val(b.toFixed(maxD)),
+                MATH.eq(), MATH.val(ans)
+            ));
+        } else if (op === '×') {
+            const dA = (a.toString().split('.')[1] || '').length;
+            const dB = (b.toString().split('.')[1] || '').length;
+            const totalD = dA + dB;
+            const intA = Math.round(a * Math.pow(10, dA));
+            const intB = Math.round(b * Math.pow(10, dB));
+            const product = intA * intB;
+            steps += MATH.step(2, MATH.expr(MATH.txt('Nhân bỏ dấu phẩy:'), MATH.val(intA), MATH.op('×'), MATH.val(intB), MATH.eq(), MATH.val(product)));
+            steps += MATH.step(3, MATH.expr(MATH.txt(`Đếm ${totalD} chữ số thập phân → dời dấu phẩy`)));
+        } else {
+            // Division
+            steps += MATH.step(2, MATH.expr(MATH.txt('Chia:'), MATH.frac(a, b)));
+            steps += MATH.step(3, MATH.expr(
+                MATH.val(a), MATH.op('÷'), MATH.val(b), MATH.eq(), MATH.val(ans)
+            ));
+        }
+        steps += MATH.answer(MATH.val(a) + MATH.op(op) + MATH.val(b) + MATH.eq() + MATH.val(ans));
+        return steps;
+    }
+
+    function showSolution(fb, q, isSkip) {
+        const icon = isSkip ? '⏭' : '❌';
+        const border = isSkip ? 'rgba(251,191,36,0.4)' : 'rgba(248,113,113,0.4)';
+        const bg = isSkip ? 'rgba(251,191,36,0.06)' : 'rgba(248,113,113,0.06)';
+        fb.innerHTML = `<div class="card solution-card" style="border-color:${border};background:${bg}">
+            <h3>${icon} Lời giải</h3>${buildSolution(q)}
+        </div>`;
+    }
+
     function checkAnswer(box) {
         if (!currentQ) return;
         const inp = parseFloat(box.querySelector('#tp-answer').value);
@@ -97,15 +145,13 @@
         if (Math.abs(inp - currentQ.ans) < 0.01) {
             score += 10; streak++;
             if (streak > bestStreak) bestStreak = streak;
-            fb.innerHTML = `<div class="answer-box" style="border-color:rgba(52,211,153,0.4)">
-                ✅ Đúng! ${MATH.expr(MATH.val(currentQ.a), MATH.op(currentQ.op), MATH.val(currentQ.b), MATH.eq(), MATH.val(currentQ.ans))}
+            fb.innerHTML = `<div class="card solution-card" style="border-color:rgba(52,211,153,0.3)">
+                <h3>✅ Chính xác! +10 điểm</h3>${buildSolution(currentQ)}
             </div>`;
-            setTimeout(() => newQuestion(box), 1200);
+            setTimeout(() => newQuestion(box), 2000);
         } else {
             streak = 0;
-            fb.innerHTML = `<div class="answer-box" style="border-color:rgba(248,113,113,0.4);background:rgba(248,113,113,0.1)">
-                ❌ Sai! Đáp án: ${MATH.expr(MATH.val(currentQ.a), MATH.op(currentQ.op), MATH.val(currentQ.b), MATH.eq(), MATH.val(currentQ.ans))}
-            </div>`;
+            showSolution(fb, currentQ, false);
         }
         box.querySelector('#tp-score').textContent = score;
         box.querySelector('#tp-streak').textContent = streak;
@@ -136,9 +182,11 @@
             const d = parseInt(box.querySelector('#cv-den').value) || 1;
             const dec = n / d;
             const r = box.querySelector('#cv-r1');
+            const decStr = dec.toFixed(dec % 1 === 0 ? 0 : 4).replace(/0+$/, '').replace(/\.$/, '');
             r.innerHTML =
-                MATH.step(1, MATH.expr(MATH.frac(n, d), MATH.eq(), MATH.val(n), MATH.op('÷'), MATH.val(d))) +
-                MATH.answer(MATH.frac(n, d) + MATH.eq() + MATH.val(dec.toFixed(dec % 1 === 0 ? 0 : 4).replace(/0+$/, '').replace(/\.$/, '')));
+                MATH.step(1, MATH.expr(MATH.txt('Thực hiện phép chia:'))) +
+                MATH.step(2, MATH.expr(MATH.frac(n, d), MATH.eq(), MATH.val(n), MATH.op('÷'), MATH.val(d))) +
+                MATH.answer(MATH.frac(n, d) + MATH.eq() + MATH.val(decStr));
         };
         const updateD2F = () => {
             const v = box.querySelector('#cv-dec').value.trim();
@@ -151,9 +199,10 @@
             const num = Math.round(dec * den);
             const g = MATH.gcd(num, den);
             const sn = num / g, sd = den / g;
-            let html = MATH.step(1, MATH.expr(MATH.val(v), MATH.eq(), MATH.frac(num, den)));
+            let html = MATH.step(1, MATH.expr(MATH.txt(`Có ${places} chữ số thập phân → mẫu ${den}`)));
+            html += MATH.step(2, MATH.expr(MATH.val(v), MATH.eq(), MATH.frac(num, den)));
             if (g > 1) {
-                html += MATH.step(2, MATH.expr(MATH.txt('Rút gọn cho'), MATH.val(g), MATH.txt(':')));
+                html += MATH.step(3, MATH.expr(MATH.txt('Rút gọn cho'), MATH.val(g), MATH.txt(':')));
                 html += MATH.answer(MATH.frac(num, den) + MATH.eq() + MATH.frac(sn, sd));
             } else {
                 html += MATH.answer(MATH.frac(sn, sd));
@@ -180,6 +229,8 @@
                 <div class="pill-group" style="margin-top:8px" id="lu-ops">
                     <button class="pill active" data-op="+">➕ Cộng</button>
                     <button class="pill" data-op="-">➖ Trừ</button>
+                    <button class="pill" data-op="×">✖ Nhân</button>
+                    <button class="pill" data-op="÷">➗ Chia</button>
                 </div>
                 <div id="lu-result" style="margin-top:16px"></div>
             </div>`;
@@ -189,23 +240,55 @@
             const b = box.querySelector('#lu-b').value.trim();
             const va = parseFloat(a), vb = parseFloat(b);
             if (isNaN(va) || isNaN(vb)) return;
-            const ans = op === '+' ? va + vb : va - vb;
-            // Format vertical alignment
+            let ans;
+            if (op === '+') ans = va + vb;
+            else if (op === '-') ans = va - vb;
+            else if (op === '×') ans = va * vb;
+            else ans = vb !== 0 ? va / vb : 0;
+
+            let steps = '';
             const dA = (a.split('.')[1] || '').length;
             const dB = (b.split('.')[1] || '').length;
-            const maxD = Math.max(dA, dB);
-            const fA = va.toFixed(maxD), fB = vb.toFixed(maxD), fAns = ans.toFixed(maxD);
-            const maxLen = Math.max(fA.length, fB.length, fAns.length) + 2;
 
-            const pad = s => s.padStart(maxLen);
-            box.querySelector('#lu-result').innerHTML = `
-                <pre style="font-family:'JetBrains Mono',monospace;font-size:1.3rem;color:var(--accent-yellow);line-height:1.8;text-align:right;background:rgba(15,23,42,0.5);padding:20px;border-radius:12px;border-left:3px solid #7c3aed">
+            if (op === '+' || op === '-') {
+                const maxD = Math.max(dA, dB);
+                const fA = va.toFixed(maxD), fB = vb.toFixed(maxD), fAns = ans.toFixed(maxD);
+                const maxLen = Math.max(fA.length, fB.length, fAns.length) + 2;
+                const pad = s => s.padStart(maxLen);
+
+                steps += MATH.step(1, MATH.expr(MATH.txt('Viết số thẳng dấu phẩy:')));
+                steps += `<pre style="font-family:'JetBrains Mono',monospace;font-size:1.3rem;color:var(--accent-yellow);line-height:1.8;text-align:right;background:rgba(15,23,42,0.5);padding:20px;border-radius:12px;border-left:3px solid #7c3aed">
 ${pad(fA)}
 <span style="color:var(--accent-pink)">${op}</span>${fB.padStart(maxLen - 1)}
 ${'─'.repeat(maxLen)}
 <span style="color:var(--accent-green);font-weight:800">${pad(fAns)}</span>
-</pre>
-                ${MATH.answer(MATH.val(va) + MATH.op(op) + MATH.val(vb) + MATH.eq() + MATH.val(parseFloat(fAns)))}`;
+</pre>`;
+                steps += MATH.step(2, MATH.expr(MATH.txt(op === '+' ? 'Cộng' : 'Trừ'), MATH.txt('từ phải sang trái, nhớ viết dấu phẩy thẳng cột')));
+                steps += MATH.answer(MATH.val(va) + MATH.op(op) + MATH.val(vb) + MATH.eq() + MATH.val(parseFloat(fAns)));
+            } else if (op === '×') {
+                const totalD = dA + dB;
+                const intA = Math.round(va * Math.pow(10, dA));
+                const intB = Math.round(vb * Math.pow(10, dB));
+                const product = intA * intB;
+                const fAns = +ans.toFixed(totalD + 2);
+                steps += MATH.step(1, MATH.expr(MATH.txt('Bỏ dấu phẩy, nhân như số tự nhiên:')));
+                steps += MATH.step(2, MATH.expr(MATH.val(intA), MATH.op('×'), MATH.val(intB), MATH.eq(), MATH.val(product)));
+                steps += MATH.step(3, MATH.expr(MATH.txt(`Đếm: ${dA} + ${dB} = ${totalD} chữ số thập phân`)));
+                steps += MATH.step(4, MATH.expr(MATH.txt('Dời dấu phẩy'), MATH.val(totalD), MATH.txt('chữ số từ phải sang trái')));
+                steps += MATH.answer(MATH.val(va) + MATH.op('×') + MATH.val(vb) + MATH.eq() + MATH.val(fAns));
+            } else {
+                const fAns = +ans.toFixed(4);
+                steps += MATH.step(1, MATH.expr(MATH.txt('Thực hiện phép chia:')));
+                steps += MATH.step(2, MATH.expr(MATH.frac(va, vb)));
+                if (dB > 0) {
+                    const mul = Math.pow(10, dB);
+                    steps += MATH.step(3, MATH.expr(MATH.txt(`Nhân cả tử và mẫu cho ${mul} để bỏ dấu phẩy ở mẫu:`)));
+                    steps += MATH.step(4, MATH.expr(MATH.frac(+(va * mul).toFixed(dA > dB ? dA - dB : 0), Math.round(vb * mul))));
+                }
+                steps += MATH.answer(MATH.val(va) + MATH.op('÷') + MATH.val(vb) + MATH.eq() + MATH.val(fAns));
+            }
+
+            box.querySelector('#lu-result').innerHTML = `<div class="card solution-card"><h3>📝 Bài giải</h3>${steps}</div>`;
         };
         box.querySelectorAll('#lu-ops .pill').forEach(p => {
             p.addEventListener('click', () => {

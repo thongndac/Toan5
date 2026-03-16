@@ -171,6 +171,19 @@ body {
     text-align: center;
 }
 
+.nav-section-label {
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    padding: 14px 12px 4px;
+    text-transform: uppercase;
+}
+
+.nav-section-label:first-child {
+    padding-top: 6px;
+}
+
 /* ── Main Content ── */
 .main-content {
     flex: 1;
@@ -800,4 +813,49 @@ input[type="range"]::-webkit-slider-thumb {
 
 .pop {
     animation: pop 0.3s ease;
+}
+
+/* ════════════════════════════════════════════
+   REF TABLE
+   ════════════════════════════════════════════ */
+.ref-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.88rem;
+    margin-top: 8px;
+}
+
+.ref-table th {
+    background: rgba(96, 165, 250, 0.12);
+    color: var(--accent-blue);
+    font-weight: 700;
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 2px solid rgba(96, 165, 250, 0.15);
+}
+
+.ref-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.ref-table tr:hover td {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* ── Select Dropdown ── */
+select.input-field {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+}
+
+/* ── Canvas Container ── */
+canvas {
+    border-radius: var(--radius-md);
 }

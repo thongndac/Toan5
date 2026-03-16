@@ -191,38 +191,55 @@
         if (!el) return;
         const d = dims[currentShape], ba = getBaseArea(), vol = ba * d.h * progress, name = shapeNames[currentShape];
 
-        let areaStr = '';
+        let areaExpr = '';
+        let areaDetail = '';
         switch (currentShape) {
-            case 'box': areaStr = `<span class="f-blue">${d.w}</span> × <span class="f-green">${d.d}</span> = <span class="f-yellow">${ba.toFixed(1)}</span>`; break;
-            case 'triangle': areaStr = `½ × <span class="f-blue">${d.a}</span> × <span class="f-green">${d.b}</span> = <span class="f-yellow">${ba.toFixed(1)}</span>`; break;
-            case 'circle': areaStr = `π × <span class="f-blue">${d.r}</span>² = <span class="f-yellow">${ba.toFixed(2)}</span>`; break;
-            case 'pentagon': areaStr = `½×5×<span class="f-blue">${d.r}</span>²×sin(72°) = <span class="f-yellow">${ba.toFixed(2)}</span>`; break;
-            case 'hexagon': areaStr = `½×6×<span class="f-blue">${d.r}</span>²×sin(60°) = <span class="f-yellow">${ba.toFixed(2)}</span>`; break;
-            case 'star': areaStr = `(ngôi sao) = <span class="f-yellow">${ba.toFixed(2)}</span>`; break;
-            case 'ellipse': areaStr = `π × <span class="f-blue">${d.rx}</span> × <span class="f-green">${d.ry}</span> = <span class="f-yellow">${ba.toFixed(2)}</span>`; break;
+            case 'box':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.val(d.w), MATH.op('×'), MATH.val(d.d), MATH.eq(), MATH.val(ba.toFixed(1)));
+                areaDetail = `hình chữ nhật (${d.w} × ${d.d})`;
+                break;
+            case 'triangle':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.frac(`${d.a} × ${d.b}`, 2), MATH.eq(), MATH.val(ba.toFixed(1)));
+                areaDetail = `tam giác (đáy ${d.a}, cao ${d.b})`;
+                break;
+            case 'circle':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.r + '²'), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `hình tròn (r = ${d.r})`;
+                break;
+            case 'pentagon':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.frac(`5 × ${d.r}² × sin72°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `ngũ giác đều (r = ${d.r})`;
+                break;
+            case 'hexagon':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.frac(`6 × ${d.r}² × sin60°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `lục giác đều (r = ${d.r})`;
+                break;
+            case 'star':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.txt('(ngôi sao)'), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `ngôi sao 5 cánh (R = ${d.r})`;
+                break;
+            case 'ellipse':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.rx), MATH.op('×'), MATH.val(d.ry), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `hình elip (a = ${d.rx}, b = ${d.ry})`;
+                break;
         }
 
         el.innerHTML = `
-            <div class="formula-line"><span class="f-blue">S<sub>đáy</sub></span> = ${areaStr}</div>
-            <div class="formula-line"><span class="highlight f-purple">V</span> = <span class="f-yellow">S<sub>đáy</sub></span> × <span class="f-pink">h</span> = <span class="f-yellow">${ba.toFixed(1)}</span> × <span class="f-pink">${(d.h * progress).toFixed(1)}</span> = <span class="highlight f-orange">${vol.toFixed(1)}</span></div>
-        `;
+        ${MATH.step(1, '<span class="txt">Diện tích đáy:</span> ' + areaExpr)}
+        ${MATH.step(2, MATH.expr(
+            MATH.lbl('V'), MATH.eq(),
+            MATH.lbl('S<sub>đáy</sub>'), MATH.op('×'), MATH.lbl('h'), MATH.eq(),
+            MATH.val(ba.toFixed(1)), MATH.op('×'), MATH.val((d.h * progress).toFixed(1)), MATH.eq(),
+            MATH.val(vol.toFixed(1))
+        ))}
+        ${progress >= 1 ? MATH.answer(MATH.lbl('V') + MATH.eq() + MATH.val((ba * d.h).toFixed(1))) : ''}
+    `;
 
         if (explain) {
-            let bd = '';
-            switch (currentShape) {
-                case 'box': bd = `hình chữ nhật (${d.w} × ${d.d})`; break;
-                case 'triangle': bd = `tam giác (đáy ${d.a}, cao ${d.b})`; break;
-                case 'circle': bd = `hình tròn (r = ${d.r})`; break;
-                case 'pentagon': bd = `ngũ giác đều (r = ${d.r})`; break;
-                case 'hexagon': bd = `lục giác đều (r = ${d.r})`; break;
-                case 'star': bd = `ngôi sao 5 cánh (R = ${d.r})`; break;
-                case 'ellipse': bd = `hình elip (a = ${d.rx}, b = ${d.ry})`; break;
-            }
-            explain.innerHTML = `<strong>${name}</strong> — mặt đáy ${bd}, kéo lên theo <span class="f-pink">h = ${d.h}</span>.<br>
-            🔑 <span class="f-purple"><strong>V</strong></span> = <span class="f-yellow">S<sub>đáy</sub></span> × <span class="f-pink">h</span> = <strong class="f-orange">${(ba * d.h).toFixed(1)}</strong>`;
+            explain.innerHTML = `<strong>${name}</strong> — mặt đáy ${areaDetail}, kéo lên theo <span class="f-pink">h = ${d.h}</span>.<br>
+        🔑 ${MATH.expr(MATH.lbl('V'), MATH.eq(), MATH.lbl('S<sub>đáy</sub>'), MATH.op('×'), MATH.lbl('h'), MATH.eq(), MATH.val((ba * d.h).toFixed(1)))}`;
         }
     }
-
     /* ── Sliders ── */
     function buildSliders() {
         const c = document.getElementById('hh-sliders'); if (!c) return;

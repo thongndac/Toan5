@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎓 Toán Vui — Lớp 5</title>
     <meta name="description"
-        content="Học Toán lớp 5 qua hình ảnh tương tác — Phân số, Số thập phân, Hình học 3D, Vận tốc và Luyện tập">
+        content="Học Toán lớp 5 toàn diện — Ôn tập, Phân số, Số thập phân, Hình phẳng, Phần trăm, Hình khối 3D, Đo lường, Vận tốc, Thống kê và Luyện tập">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
@@ -18,9 +18,14 @@
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-brand">
                 <h1>🎓 Toán Vui</h1>
-                <p>Chương trình Toán Lớp 5</p>
+                <p>Chương trình Toán Lớp 5 — CTST</p>
             </div>
             <div class="sidebar-nav">
+                <div class="nav-section-label">HỌC KÌ 1</div>
+                <a class="nav-item" data-module="on-tap" href="#on-tap">
+                    <span class="nav-icon">🔁</span>
+                    <span class="nav-label">Ôn Tập & Bổ Sung</span>
+                </a>
                 <a class="nav-item" data-module="phan-so" href="#phan-so">
                     <span class="nav-icon">📊</span>
                     <span class="nav-label">Phân Số</span>
@@ -29,17 +34,37 @@
                     <span class="nav-icon">🔢</span>
                     <span class="nav-label">Số Thập Phân</span>
                 </a>
-                <a class="nav-item" data-module="hinh-hoc" href="#hinh-hoc">
+                <a class="nav-item" data-module="hinh-phang" href="#hinh-phang">
+                    <span class="nav-icon">📐</span>
+                    <span class="nav-label">Hình Phẳng</span>
+                </a>
+
+                <div class="nav-section-label">HỌC KÌ 2</div>
+                <a class="nav-item" data-module="phan-tram" href="#phan-tram">
+                    <span class="nav-icon">💯</span>
+                    <span class="nav-label">Phần Trăm</span>
+                </a>
+                <a class="nav-item" data-module="hinh-khoi" href="#hinh-khoi">
                     <span class="nav-icon">🧊</span>
-                    <span class="nav-label">Hình Học 3D</span>
+                    <span class="nav-label">Hình Khối 3D</span>
+                </a>
+                <a class="nav-item" data-module="do-luong" href="#do-luong">
+                    <span class="nav-icon">📏</span>
+                    <span class="nav-label">Đo Lường</span>
                 </a>
                 <a class="nav-item" data-module="van-toc" href="#van-toc">
                     <span class="nav-icon">🚀</span>
                     <span class="nav-label">Vận Tốc</span>
                 </a>
+                <a class="nav-item" data-module="thong-ke" href="#thong-ke">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Thống Kê</span>
+                </a>
+
+                <div class="nav-section-label">LUYỆN TẬP</div>
                 <a class="nav-item" data-module="luyen-tap" href="#luyen-tap">
                     <span class="nav-icon">📝</span>
-                    <span class="nav-label">Luyện Tập</span>
+                    <span class="nav-label">Luyện Tập Tổng Hợp</span>
                 </a>
             </div>
             <div class="sidebar-footer">
@@ -67,10 +92,15 @@
     <script src="js/app.js"></script>
 
     <!-- ── Modules (register into APP) ── -->
+    <script src="js/on-tap.js"></script>
     <script src="js/phan-so.js"></script>
     <script src="js/thap-phan.js"></script>
-    <script src="js/hinh-hoc.js"></script>
+    <script src="js/hinh-phang.js"></script>
+    <script src="js/phan-tram.js"></script>
+    <script src="js/hinh-khoi.js"></script>
+    <script src="js/do-luong.js"></script>
     <script src="js/van-toc.js"></script>
+    <script src="js/thong-ke.js"></script>
     <script src="js/luyen-tap.js"></script>
 </body>
 
