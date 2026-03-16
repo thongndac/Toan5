@@ -1,302 +1,411 @@
 /* ════════════════════════════════════════════
-   HINH-KHOI.JS — Hình Khối 3D
-   Hình hộp CN, Hình lập phương, Hình trụ
+   MODULE: HÌNH KHỐI 3D (Extrude Approach)
+   V = Sđáy × h — "kéo" mặt đáy lên theo h
+   Migrated from hinh-hoc.js
    ════════════════════════════════════════════ */
-(function () {
-    let scene, camera, renderer, controls, meshRef, animId;
+(() => {
+    let scene, camera, renderer, controls;
+    let currentShape = 'box';
+    let buildProgress = 0, isBuilding = false, buildAnimId = null;
+    let baseMesh = null, bodyMesh = null, topMesh = null, edgeLines = null;
+    let extraMeshes = [], labelSprites = [], gridHelper = null;
+    let animLoopId = null;
+    let matBase, matBody, matTop, matEdge;
 
-    function cleanup3D() {
-        if (animId) cancelAnimationFrame(animId);
-        if (renderer) renderer.dispose();
-        scene = camera = renderer = controls = meshRef = null;
-        animId = null;
+    const dims = {
+        box: { w: 5, d: 3, h: 4 },
+        triangle: { a: 5, b: 3.5, h: 4 },
+        circle: { r: 2.5, h: 4 },
+        pentagon: { r: 2.5, h: 4 },
+        hexagon: { r: 2.5, h: 4 },
+        star: { r: 3, h: 4 },
+        ellipse: { rx: 3, ry: 2, h: 4 },
+    };
+
+    const sliderConfig = {
+        box: [{ key: 'w', label: 'Chiều dài (a)', min: 1, max: 8, step: 0.5 }, { key: 'd', label: 'Chiều rộng (b)', min: 1, max: 8, step: 0.5 }, { key: 'h', label: 'Chiều cao (h)', min: 1, max: 8, step: 0.5 }],
+        triangle: [{ key: 'a', label: 'Cạnh đáy (a)', min: 1, max: 8, step: 0.5 }, { key: 'b', label: 'Chiều cao tam giác (b)', min: 1, max: 8, step: 0.5 }, { key: 'h', label: 'Chiều cao lăng trụ (h)', min: 1, max: 8, step: 0.5 }],
+        circle: [{ key: 'r', label: 'Bán kính (r)', min: 0.5, max: 4, step: 0.25 }, { key: 'h', label: 'Chiều cao (h)', min: 1, max: 8, step: 0.5 }],
+        pentagon: [{ key: 'r', label: 'Bán kính ngoại tiếp (r)', min: 0.5, max: 4, step: 0.25 }, { key: 'h', label: 'Chiều cao (h)', min: 1, max: 8, step: 0.5 }],
+        hexagon: [{ key: 'r', label: 'Bán kính ngoại tiếp (r)', min: 0.5, max: 4, step: 0.25 }, { key: 'h', label: 'Chiều cao (h)', min: 1, max: 8, step: 0.5 }],
+        star: [{ key: 'r', label: 'Bán kính ngoài (r)', min: 1, max: 5, step: 0.25 }, { key: 'h', label: 'Chiều cao (h)', min: 1, max: 8, step: 0.5 }],
+        ellipse: [{ key: 'rx', label: 'Bán trục lớn (a)', min: 1, max: 5, step: 0.25 }, { key: 'ry', label: 'Bán trục nhỏ (b)', min: 0.5, max: 4, step: 0.25 }, { key: 'h', label: 'Chiều cao (h)', min: 1, max: 8, step: 0.5 }],
+    };
+
+    const shapeNames = {
+        box: 'Hộp chữ nhật', triangle: 'Lăng trụ tam giác', circle: 'Hình trụ tròn',
+        pentagon: 'Lăng trụ ngũ giác đều', hexagon: 'Lăng trụ lục giác đều',
+        star: 'Lăng trụ ngôi sao', ellipse: 'Hình trụ elip',
+    };
+
+    /* ── Shape generators ── */
+    function makeRectShape(w, d) { const s = new THREE.Shape(); s.moveTo(-w / 2, -d / 2); s.lineTo(w / 2, -d / 2); s.lineTo(w / 2, d / 2); s.lineTo(-w / 2, d / 2); s.closePath(); return s; }
+    function makeTriangleShape(a, b) { const s = new THREE.Shape(); s.moveTo(-a / 2, 0); s.lineTo(a / 2, 0); s.lineTo(0, b); s.closePath(); return s; }
+    function makeCircleShape(r, seg = 64) { const s = new THREE.Shape(); for (let i = 0; i <= seg; i++) { const a = (i / seg) * Math.PI * 2, x = r * Math.cos(a), y = r * Math.sin(a); if (i === 0) s.moveTo(x, y); else s.lineTo(x, y); } s.closePath(); return s; }
+    function makePolygonShape(r, sides) { const s = new THREE.Shape(); for (let i = 0; i <= sides; i++) { const a = (i / sides) * Math.PI * 2 - Math.PI / 2, x = r * Math.cos(a), y = r * Math.sin(a); if (i === 0) s.moveTo(x, y); else s.lineTo(x, y); } s.closePath(); return s; }
+    function makeStarShape(R, pts = 5) { const ri = R * 0.45; const s = new THREE.Shape(); for (let i = 0; i <= pts * 2; i++) { const a = (i / (pts * 2)) * Math.PI * 2 - Math.PI / 2, r = (i % 2 === 0) ? R : ri, x = r * Math.cos(a), y = r * Math.sin(a); if (i === 0) s.moveTo(x, y); else s.lineTo(x, y); } s.closePath(); return s; }
+    function makeEllipseShape(rx, ry, seg = 64) { const s = new THREE.Shape(); for (let i = 0; i <= seg; i++) { const a = (i / seg) * Math.PI * 2, x = rx * Math.cos(a), y = ry * Math.sin(a); if (i === 0) s.moveTo(x, y); else s.lineTo(x, y); } s.closePath(); return s; }
+
+    function getBaseShape() {
+        const d = dims[currentShape];
+        switch (currentShape) {
+            case 'box': return makeRectShape(d.w, d.d);
+            case 'triangle': return makeTriangleShape(d.a, d.b);
+            case 'circle': return makeCircleShape(d.r);
+            case 'pentagon': return makePolygonShape(d.r, 5);
+            case 'hexagon': return makePolygonShape(d.r, 6);
+            case 'star': return makeStarShape(d.r);
+            case 'ellipse': return makeEllipseShape(d.rx, d.ry);
+        }
     }
 
-    function init3D(containerId, w, h) {
-        cleanup3D();
-        const container = document.getElementById(containerId);
-        if (!container) return;
+    function getBaseArea() {
+        const d = dims[currentShape];
+        switch (currentShape) {
+            case 'box': return d.w * d.d;
+            case 'triangle': return 0.5 * d.a * d.b;
+            case 'circle': return Math.PI * d.r * d.r;
+            case 'pentagon': return 0.5 * 5 * d.r * d.r * Math.sin(2 * Math.PI / 5);
+            case 'hexagon': return 0.5 * 6 * d.r * d.r * Math.sin(2 * Math.PI / 6);
+            case 'star': { const inner = d.r * 0.45; return 0.5 * 10 * d.r * inner * Math.sin(Math.PI / 5); }
+            case 'ellipse': return Math.PI * d.rx * d.ry;
+        }
+    }
 
+    /* ── Labels ── */
+    function makeLabel(text, color = '#fff', fs = 40) {
+        const c = document.createElement('canvas'), ctx = c.getContext('2d');
+        c.width = 256; c.height = 72;
+        ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(6, 6, c.width - 12, c.height - 12, 12); ctx.fill();
+        ctx.font = `bold ${fs}px Nunito,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = color; ctx.fillText(text, c.width / 2, c.height / 2);
+        const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true;
+        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+        const sp = new THREE.Sprite(mat); sp.scale.set(2.2, 0.65, 1); return sp;
+    }
+
+    function makeVertexDot(letter, x, y, z, color = '#fbbf24') {
+        const geo = new THREE.SphereGeometry(0.1, 16, 16);
+        const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color) });
+        const sphere = new THREE.Mesh(geo, mat); sphere.position.set(x, y, z); addObj(sphere);
+        const c = document.createElement('canvas'), ctx = c.getContext('2d'); c.width = 96; c.height = 96;
+        ctx.beginPath(); ctx.arc(48, 48, 40, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fill();
+        ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
+        ctx.font = 'bold 44px Nunito,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = color; ctx.fillText(letter, 48, 48);
+        const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true;
+        const sm = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+        const sp = new THREE.Sprite(sm); sp.scale.set(0.7, 0.7, 1); sp.position.set(x, y + 0.45, z); addObj(sp);
+    }
+
+    function clearLabels() { labelSprites.forEach(s => scene.remove(s)); labelSprites = []; }
+    function addObj(obj) { scene.add(obj); labelSprites.push(obj); }
+    function makeArrowLine(from, to, color) {
+        return new THREE.Line(new THREE.BufferGeometry().setFromPoints([from, to]), new THREE.LineBasicMaterial({ color }));
+    }
+
+    /* ── Vertex positions ── */
+    const vertexLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    function getVertexPositions2D() {
+        const d = dims[currentShape];
+        switch (currentShape) {
+            case 'box': return [{ x: -d.w / 2, z: d.d / 2 }, { x: d.w / 2, z: d.d / 2 }, { x: d.w / 2, z: -d.d / 2 }, { x: -d.w / 2, z: -d.d / 2 }];
+            case 'triangle': return [{ x: -d.a / 2, z: 0 }, { x: d.a / 2, z: 0 }, { x: 0, z: -d.b }];
+            case 'pentagon': { const p = []; for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2 - Math.PI / 2; p.push({ x: d.r * Math.cos(a), z: -d.r * Math.sin(a) }); } return p; }
+            case 'hexagon': { const p = []; for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 - Math.PI / 2; p.push({ x: d.r * Math.cos(a), z: -d.r * Math.sin(a) }); } return p; }
+            default: return null;
+        }
+    }
+
+    function addVertexLabels(progress) {
+        const pts = getVertexPositions2D(), d = dims[currentShape], h = d.h * progress;
+        if (pts) {
+            pts.forEach((p, i) => makeVertexDot(vertexLetters[i], p.x, 0, p.z, '#fbbf24'));
+            if (h > 0.15) pts.forEach((p, i) => makeVertexDot(vertexLetters[i] + "'", p.x, h, p.z, '#34d399'));
+        }
+        if (currentShape === 'circle' || currentShape === 'ellipse') {
+            makeVertexDot('O', 0, 0, 0, '#fbbf24');
+            if (h > 0.15) makeVertexDot("O'", 0, h, 0, '#34d399');
+        }
+    }
+
+    function addDimensionLabels(progress) {
+        clearLabels();
+        const d = dims[currentShape], h = d.h * progress;
+        addVertexLabels(progress);
+        if (h > 0.15) {
+            const lh = makeLabel(`h = ${h.toFixed(1)}`, '#f472b6');
+            const offX = currentShape === 'box' ? -d.w / 2 - 1.4 : currentShape === 'triangle' ? d.a / 2 + 1.4 : currentShape === 'ellipse' ? -d.rx - 0.8 : -(d.r || 3) - 1.2;
+            const offZ = currentShape === 'box' ? -d.d / 2 - 0.3 : 0;
+            lh.position.set(offX, h / 2, offZ); addObj(lh);
+            addObj(makeArrowLine(new THREE.Vector3(offX + 0.4, 0, offZ), new THREE.Vector3(offX + 0.4, h, offZ), 0xf472b6));
+        }
+        if (currentShape === 'box') {
+            const la = makeLabel(`a = ${d.w}`, '#60a5fa'); la.position.set(0, -0.7, d.d / 2 + 0.8); addObj(la);
+            const lb = makeLabel(`b = ${d.d}`, '#34d399'); lb.position.set(d.w / 2 + 0.8, -0.7, 0); addObj(lb);
+        } else if (currentShape === 'triangle') {
+            const la = makeLabel(`a = ${d.a}`, '#60a5fa'); la.position.set(0, -0.7, 0.8); addObj(la);
+            const lb = makeLabel(`b = ${d.b}`, '#34d399'); lb.position.set(-d.a / 2 - 1.2, -0.7, -d.b / 2); addObj(lb);
+        } else if (currentShape === 'circle') {
+            const lr = makeLabel(`r = ${d.r}`, '#60a5fa'); lr.position.set(d.r / 2, -0.5, 0.6); addObj(lr);
+            addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(d.r, 0.02, 0), 0x60a5fa));
+        } else if (currentShape === 'pentagon' || currentShape === 'hexagon') {
+            const lr = makeLabel(`r = ${d.r}`, '#60a5fa'); lr.position.set(0, -0.7, d.r + 0.8); addObj(lr);
+            addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(d.r, 0.02, 0), 0x60a5fa));
+        } else if (currentShape === 'star') {
+            const lr = makeLabel(`R = ${d.r}`, '#60a5fa'); lr.position.set(d.r / 2, -0.5, d.r + 0.4); addObj(lr);
+            addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(d.r * Math.cos(-Math.PI / 2), 0.02, d.r * Math.sin(-Math.PI / 2)), 0x60a5fa));
+        } else if (currentShape === 'ellipse') {
+            const la = makeLabel(`a = ${d.rx}`, '#60a5fa'); la.position.set(d.rx / 2, -0.5, d.ry + 0.4); addObj(la);
+            addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(d.rx, 0.02, 0), 0x60a5fa));
+            const lb = makeLabel(`b = ${d.ry}`, '#34d399'); lb.position.set(-d.rx - 0.6, -0.5, d.ry / 2); addObj(lb);
+            addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(0, 0.02, d.ry), 0x34d399));
+        }
+    }
+
+    /* ── Build shape ── */
+    function clearShape() {
+        [baseMesh, bodyMesh, topMesh, edgeLines, ...extraMeshes].forEach(m => { if (m) scene.remove(m); });
+        baseMesh = bodyMesh = topMesh = edgeLines = null; extraMeshes = [];
+    }
+
+    function buildShape(progress) {
+        clearShape();
+        const d = dims[currentShape], h = d.h * progress, shape = getBaseShape();
+        const baseGeo = new THREE.ShapeGeometry(shape);
+        baseMesh = new THREE.Mesh(baseGeo, matBase); baseMesh.rotation.x = -Math.PI / 2; baseMesh.position.y = 0.005; scene.add(baseMesh);
+        if (h > 0.01) {
+            const extGeo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+            bodyMesh = new THREE.Mesh(extGeo, matBody); bodyMesh.rotation.x = -Math.PI / 2; scene.add(bodyMesh);
+            const topGeo = new THREE.ShapeGeometry(shape);
+            topMesh = new THREE.Mesh(topGeo, matTop); topMesh.rotation.x = -Math.PI / 2; topMesh.position.y = h; scene.add(topMesh);
+            const edges = new THREE.EdgesGeometry(extGeo);
+            edgeLines = new THREE.LineSegments(edges, matEdge); edgeLines.rotation.x = -Math.PI / 2; scene.add(edgeLines);
+        }
+        addDimensionLabels(progress);
+    }
+
+    /* ── Formula ── */
+    function updateFormula(progress) {
+        const el = document.getElementById('hk-formula');
+        const explain = document.getElementById('hk-explain');
+        if (!el) return;
+        const d = dims[currentShape], ba = getBaseArea(), vol = ba * d.h * progress, name = shapeNames[currentShape];
+
+        let areaExpr = '';
+        let areaDetail = '';
+        switch (currentShape) {
+            case 'box':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.val(d.w), MATH.op('×'), MATH.val(d.d), MATH.eq(), MATH.val(ba.toFixed(1)));
+                areaDetail = `hình chữ nhật (${d.w} × ${d.d})`;
+                break;
+            case 'triangle':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.frac(`${d.a} × ${d.b}`, 2), MATH.eq(), MATH.val(ba.toFixed(1)));
+                areaDetail = `tam giác (đáy ${d.a}, cao ${d.b})`;
+                break;
+            case 'circle':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.r + '²'), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `hình tròn (r = ${d.r})`;
+                break;
+            case 'pentagon':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.frac(`5 × ${d.r}² × sin72°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `ngũ giác đều (r = ${d.r})`;
+                break;
+            case 'hexagon':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.frac(`6 × ${d.r}² × sin60°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `lục giác đều (r = ${d.r})`;
+                break;
+            case 'star':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.txt('(ngôi sao)'), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `ngôi sao 5 cánh (R = ${d.r})`;
+                break;
+            case 'ellipse':
+                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.rx), MATH.op('×'), MATH.val(d.ry), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaDetail = `hình elip (a = ${d.rx}, b = ${d.ry})`;
+                break;
+        }
+
+        el.innerHTML = `
+        ${MATH.step(1, '<span class="txt">Diện tích đáy:</span> ' + areaExpr)}
+        ${MATH.step(2, MATH.expr(
+            MATH.lbl('V'), MATH.eq(),
+            MATH.lbl('S<sub>đáy</sub>'), MATH.op('×'), MATH.lbl('h'), MATH.eq(),
+            MATH.val(ba.toFixed(1)), MATH.op('×'), MATH.val((d.h * progress).toFixed(1)), MATH.eq(),
+            MATH.val(vol.toFixed(1))
+        ))}
+        ${progress >= 1 ? MATH.answer(MATH.lbl('V') + MATH.eq() + MATH.val((ba * d.h).toFixed(1))) : ''}
+    `;
+
+        if (explain) {
+            explain.innerHTML = `<strong>${name}</strong> — mặt đáy ${areaDetail}, kéo lên theo <span class="f-pink">h = ${d.h}</span>.<br>
+        🔑 ${MATH.expr(MATH.lbl('V'), MATH.eq(), MATH.lbl('S<sub>đáy</sub>'), MATH.op('×'), MATH.lbl('h'), MATH.eq(), MATH.val((ba * d.h).toFixed(1)))}`;
+        }
+    }
+    /* ── Sliders ── */
+    function buildSliders() {
+        const c = document.getElementById('hk-sliders'); if (!c) return;
+        c.innerHTML = '';
+        sliderConfig[currentShape].forEach(s => {
+            const d = dims[currentShape];
+            const g = document.createElement('div'); g.className = 'slider-group';
+            g.innerHTML = `<div class="slider-label"><span>${s.label}</span><span class="val" id="hk-val-${s.key}">${d[s.key]}</span></div>
+            <input type="range" id="hk-slider-${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" value="${d[s.key]}">`;
+            c.appendChild(g);
+            g.querySelector('input').addEventListener('input', e => {
+                d[s.key] = parseFloat(e.target.value);
+                document.getElementById(`hk-val-${s.key}`).textContent = d[s.key];
+                buildShape(buildProgress > 0 ? buildProgress : 0);
+                updateFormula(buildProgress > 0 ? buildProgress : 0);
+            });
+        });
+    }
+
+    /* ── Three.js setup ── */
+    function initThree() {
+        const canvas = document.getElementById('hk-canvas'); if (!canvas) return;
+        const parent = canvas.parentElement;
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setPixelRatio(window.devicePixelRatio); renderer.setClearColor(0x000000, 0);
         scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
-        camera.position.set(4, 3, 5);
-
-        renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-        renderer.setSize(w, h);
-        renderer.setClearColor(0x000000, 0);
-        container.appendChild(renderer.domElement);
-
+        camera = new THREE.PerspectiveCamera(45, parent.clientWidth / parent.clientHeight, 0.1, 100);
+        camera.position.set(8, 6, 10);
         controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 2;
-
-        // Lighting
+        controls.enableDamping = true; controls.dampingFactor = 0.08; controls.minDistance = 5; controls.maxDistance = 30; controls.target.set(0, 2, 0);
+        camera._defaultPos = camera.position.clone(); camera._defaultTarget = controls.target.clone();
         scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-        const dl = new THREE.DirectionalLight(0xffffff, 0.8);
-        dl.position.set(5, 8, 5);
-        scene.add(dl);
+        const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(8, 12, 6); scene.add(dir);
+        scene.add(new THREE.PointLight(0x60a5fa, 0.4, 30).translateX(-5).translateY(8));
+        gridHelper = new THREE.GridHelper(14, 14, 0x333366, 0x222244); gridHelper.position.y = -0.01; scene.add(gridHelper);
 
-        // Grid
-        const grid = new THREE.GridHelper(8, 8, 0x333366, 0x222244);
-        grid.position.y = -0.01;
-        scene.add(grid);
+        matBase = new THREE.MeshPhysicalMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.6, roughness: 0.3, metalness: 0.1, side: THREE.DoubleSide });
+        matBody = new THREE.MeshPhysicalMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.35, roughness: 0.2, metalness: 0.05, side: THREE.DoubleSide });
+        matTop = new THREE.MeshPhysicalMaterial({ color: 0x34d399, transparent: true, opacity: 0.5, roughness: 0.3, metalness: 0.1, side: THREE.DoubleSide });
+        matEdge = new THREE.LineBasicMaterial({ color: 0xfbbf24, linewidth: 2 });
 
-        const animate = () => {
-            animId = requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        };
-        animate();
-    }
-
-    function addBox(a, b, c) {
-        if (!scene) return;
-        if (meshRef) scene.remove(meshRef);
-        const geo = new THREE.BoxGeometry(a, c, b);
-        const mat = new THREE.MeshPhongMaterial({
-            color: 0x60a5fa, transparent: true, opacity: 0.6,
-            side: THREE.DoubleSide
-        });
-        meshRef = new THREE.Mesh(geo, mat);
-        meshRef.position.y = c / 2;
-        scene.add(meshRef);
-
-        const edges = new THREE.EdgesGeometry(geo);
-        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x22d3ee }));
-        line.position.copy(meshRef.position);
-        meshRef.add(line);
-    }
-
-    function addCylinder(r, h) {
-        if (!scene) return;
-        if (meshRef) scene.remove(meshRef);
-        const geo = new THREE.CylinderGeometry(r, r, h, 32);
-        const mat = new THREE.MeshPhongMaterial({
-            color: 0x34d399, transparent: true, opacity: 0.6,
-            side: THREE.DoubleSide
-        });
-        meshRef = new THREE.Mesh(geo, mat);
-        meshRef.position.y = h / 2;
-        scene.add(meshRef);
-
-        const edges = new THREE.EdgesGeometry(geo);
-        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xa78bfa }));
-        meshRef.add(line);
+        function resize() { renderer.setSize(parent.clientWidth, parent.clientHeight); camera.aspect = parent.clientWidth / parent.clientHeight; camera.updateProjectionMatrix(); }
+        resize(); window.addEventListener('resize', resize);
+        (function loop() { animLoopId = requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
     }
 
     const MOD = {
         render(el) {
             el.innerHTML = `
-            <div class="section-header">
-                <h2>🧊 Hình Khối 3D</h2>
-                <p>Hình hộp chữ nhật · Hình lập phương · Hình trụ — DT & Thể tích</p>
-            </div>
-            <div class="pill-group" id="hk-tabs">
-                <button class="pill active" data-tab="hop">Hình Hộp CN</button>
-                <button class="pill" data-tab="lp">Hình Lập Phương</button>
-                <button class="pill" data-tab="tru">Hình Trụ</button>
-                <button class="pill" data-tab="donvi">Đơn Vị Thể Tích</button>
-            </div>
-            <div id="hk-content"></div>`;
+                <div class="section-header slide-up">
+                    <h2>🧊 Hình Khối 3D</h2>
+                    <p>Mọi hình khối = "kéo" mặt đáy lên theo chiều cao!</p>
+                    <div class="formula-badge"><span class="f-purple">V</span> = <span class="f-yellow">S<sub>đáy</sub></span> × <span class="f-pink">h</span></div>
+                </div>
 
-            el.querySelectorAll('#hk-tabs .pill').forEach(t => t.addEventListener('click', () => {
-                el.querySelectorAll('#hk-tabs .pill').forEach(x => x.classList.remove('active'));
-                t.classList.add('active');
-                this.showTab(t.dataset.tab);
-            }));
-            this.showTab('hop');
-        },
+                <div class="pill-group slide-up" id="hk-tabs" style="justify-content:center">
+                    <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);padding:6px 0;width:100%">🔷 LĂNG TRỤ — đáy đa giác</div>
+                    <div class="pill active" data-shape="box" onclick="ModuleHinhKhoi.selectShape('box')">📦 Chữ nhật</div>
+                    <div class="pill" data-shape="triangle" onclick="ModuleHinhKhoi.selectShape('triangle')">🔺 Tam giác</div>
+                    <div class="pill" data-shape="pentagon" onclick="ModuleHinhKhoi.selectShape('pentagon')">⬠ Ngũ giác</div>
+                    <div class="pill" data-shape="hexagon" onclick="ModuleHinhKhoi.selectShape('hexagon')">⬡ Lục giác</div>
+                    <div class="pill" data-shape="star" onclick="ModuleHinhKhoi.selectShape('star')">⭐ Ngôi sao</div>
+                    <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);padding:6px 0;width:100%">🔵 HÌNH TRỤ — đáy đường cong</div>
+                    <div class="pill" data-shape="circle" onclick="ModuleHinhKhoi.selectShape('circle')">⭕ Tròn</div>
+                    <div class="pill" data-shape="ellipse" onclick="ModuleHinhKhoi.selectShape('ellipse')">🥚 Elip</div>
+                </div>
 
-        showTab(tab) {
-            cleanup3D();
-            const c = document.getElementById('hk-content');
-            if (tab === 'hop') c.innerHTML = this.tabHop();
-            else if (tab === 'lp') c.innerHTML = this.tabLP();
-            else if (tab === 'tru') c.innerHTML = this.tabTru();
-            else if (tab === 'donvi') { c.innerHTML = this.tabDonVi(); this.bindDonVi(); return; }
-            setTimeout(() => this.bind3D(tab), 50);
-        },
-
-        tabHop() {
-            return `
-            <div class="grid-sidebar">
-                <div class="flex-col">
-                    <div class="card formula-card">
-                        <h3>📖 Hình hộp chữ nhật</h3>
-                        <div class="formula-line"><span class="highlight f-cyan">S<sub>xq</sub> = (a + b) × 2 × c</span></div>
-                        <div class="formula-line"><span class="highlight f-green">S<sub>tp</sub> = S<sub>xq</sub> + 2 × a × b</span></div>
-                        <div class="formula-line"><span class="highlight f-yellow">V = a × b × c</span></div>
+                <div class="grid-sidebar slide-up">
+                    <div class="card" style="position:relative;min-height:450px;overflow:hidden">
+                        <canvas id="hk-canvas" style="width:100%;height:100%;display:block;cursor:grab"></canvas>
+                        <button class="btn btn-secondary" style="position:absolute;bottom:12px;right:12px;padding:6px 12px;font-size:0.78rem" onclick="ModuleHinhKhoi.resetCamera()">📷 Góc nhìn mặc định</button>
                     </div>
-                    <div class="card">
-                        <h3>🧮 Tính</h3>
-                        <div class="input-group"><label>Chiều dài a (cm)</label><input class="input-field" id="hk-a" type="number" value="5"></div>
-                        <div class="input-group"><label>Chiều rộng b (cm)</label><input class="input-field" id="hk-b" type="number" value="3"></div>
-                        <div class="input-group"><label>Chiều cao c (cm)</label><input class="input-field" id="hk-c" type="number" value="4"></div>
-                        <button class="btn btn-primary btn-full" id="hk-calc">Tính</button>
-                        <div id="hk-result" style="margin-top:12px"></div>
+                    <div class="flex-col">
+                        <div class="card"><h3>📏 Kích thước</h3><div id="hk-sliders"></div></div>
+                        <div class="card">
+                            <h3>🎬 Dựng hình</h3>
+                            <button class="btn btn-primary btn-full" id="hk-btn-build" onclick="ModuleHinhKhoi.startBuild()">▶️ Bắt đầu dựng hình</button>
+                            <button class="btn btn-secondary btn-full" style="margin-top:6px" onclick="ModuleHinhKhoi.resetBuild()">🔄 Đặt lại</button>
+                            <div class="progress-bar-container"><div class="progress-bar-fill" id="hk-progress"></div></div>
+                        </div>
+                        <div class="card formula-card"><h3>📐 Công thức</h3><div id="hk-formula"></div></div>
+                        <div class="card"><h3>💡 Giải thích</h3><div id="hk-explain" style="font-size:0.88rem;color:var(--text-secondary);line-height:1.6"></div></div>
                     </div>
                 </div>
-                <div class="card"><div id="hk-3d" style="width:100%;aspect-ratio:1"></div></div>
-            </div>`;
+            `;
+
+            // Init Three.js after DOM is ready
+            setTimeout(() => {
+                currentShape = 'box';
+                buildProgress = 0;
+                isBuilding = false;
+                initThree();
+                buildSliders();
+                buildShape(0);
+                updateFormula(0);
+            }, 50);
         },
 
-        tabLP() {
-            return `
-            <div class="grid-sidebar">
-                <div class="flex-col">
-                    <div class="card formula-card">
-                        <h3>📖 Hình lập phương</h3>
-                        <div class="formula-line"><span class="highlight f-cyan">S<sub>xq</sub> = a × a × 4</span></div>
-                        <div class="formula-line"><span class="highlight f-green">S<sub>tp</sub> = a × a × 6</span></div>
-                        <div class="formula-line"><span class="highlight f-yellow">V = a × a × a</span></div>
-                    </div>
-                    <div class="card">
-                        <h3>🧮 Tính</h3>
-                        <div class="input-group"><label>Cạnh a (cm)</label><input class="input-field" id="hk-lp-a" type="number" value="4"></div>
-                        <button class="btn btn-primary btn-full" id="hk-lp-calc">Tính</button>
-                        <div id="hk-lp-result" style="margin-top:12px"></div>
-                    </div>
-                </div>
-                <div class="card"><div id="hk-3d" style="width:100%;aspect-ratio:1"></div></div>
-            </div>`;
+        selectShape(shape) {
+            currentShape = shape;
+            document.querySelectorAll('#hk-tabs .pill').forEach(p => p.classList.remove('active'));
+            document.querySelector(`#hk-tabs [data-shape="${shape}"]`)?.classList.add('active');
+            if (buildAnimId) cancelAnimationFrame(buildAnimId);
+            isBuilding = false;
+            buildProgress = 0;
+            const pb = document.getElementById('hk-progress');
+            if (pb) pb.style.width = '0%';
+            const btn = document.getElementById('hk-btn-build');
+            if (btn) btn.textContent = '▶️ Bắt đầu dựng hình';
+            buildSliders();
+            buildShape(0);
+            updateFormula(0);
         },
 
-        tabTru() {
-            return `
-            <div class="grid-sidebar">
-                <div class="flex-col">
-                    <div class="card formula-card">
-                        <h3>📖 Hình trụ</h3>
-                        <div class="formula-line"><span class="highlight f-cyan">S<sub>xq</sub> = 2 × π × r × h</span></div>
-                        <div class="formula-line"><span class="highlight f-green">S<sub>tp</sub> = S<sub>xq</sub> + 2 × π × r²</span></div>
-                        <div class="formula-line"><span class="highlight f-yellow">V = π × r² × h</span></div>
-                    </div>
-                    <div class="card">
-                        <h3>🧮 Tính</h3>
-                        <div class="input-group"><label>Bán kính r (cm)</label><input class="input-field" id="hk-tru-r" type="number" value="3"></div>
-                        <div class="input-group"><label>Chiều cao h (cm)</label><input class="input-field" id="hk-tru-h" type="number" value="7"></div>
-                        <button class="btn btn-primary btn-full" id="hk-tru-calc">Tính</button>
-                        <div id="hk-tru-result" style="margin-top:12px"></div>
-                    </div>
-                </div>
-                <div class="card"><div id="hk-3d" style="width:100%;aspect-ratio:1"></div></div>
-            </div>`;
-        },
-
-        tabDonVi() {
-            return `
-            <div class="grid-2">
-                <div class="card formula-card">
-                    <h3>📖 Đơn vị thể tích</h3>
-                    <table class="ref-table">
-                        <tr><th>Đơn vị</th><th>Quy đổi</th></tr>
-                        <tr><td>1 m³</td><td>= 1000 dm³</td></tr>
-                        <tr><td>1 dm³</td><td>= 1000 cm³ = 1 lít</td></tr>
-                        <tr><td>1 cm³</td><td>= 1 ml</td></tr>
-                        <tr><td>1 m³</td><td>= 1 000 000 cm³</td></tr>
-                    </table>
-                    <div class="formula-line" style="margin-top:12px;font-size:.85rem;color:var(--text-secondary)">
-                        Mỗi bậc gấp/giảm 1000 lần
-                    </div>
-                </div>
-                <div class="card">
-                    <h3>🧮 Đổi đơn vị thể tích</h3>
-                    <div class="input-group"><label>Giá trị</label><input class="input-field" id="hk-dv-val" type="number" value="5"></div>
-                    <div class="input-group"><label>Từ đơn vị</label>
-                        <select class="input-field" id="hk-dv-from">
-                            <option value="m3">m³</option>
-                            <option value="dm3" selected>dm³ (lít)</option>
-                            <option value="cm3">cm³ (ml)</option>
-                        </select>
-                    </div>
-                    <div class="input-group"><label>Sang đơn vị</label>
-                        <select class="input-field" id="hk-dv-to">
-                            <option value="m3">m³</option>
-                            <option value="dm3">dm³ (lít)</option>
-                            <option value="cm3" selected>cm³ (ml)</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-primary btn-full" id="hk-dv-calc">Đổi</button>
-                    <div id="hk-dv-result" style="margin-top:12px"></div>
-                </div>
-            </div>`;
-        },
-
-        bind3D(tab) {
-            const container = document.getElementById('hk-3d');
-            if (!container) return;
-            const w = container.clientWidth || 340;
-            const h = container.clientHeight || 340;
-            init3D('hk-3d', w, h);
-
-            if (tab === 'hop') {
-                addBox(2.5, 1.5, 2);
-                document.getElementById('hk-calc').addEventListener('click', () => {
-                    const a = +document.getElementById('hk-a').value;
-                    const b = +document.getElementById('hk-b').value;
-                    const c = +document.getElementById('hk-c').value;
-                    const scale = 4 / Math.max(a, b, c);
-                    addBox(a * scale, b * scale, c * scale);
-                    const sxq = (a + b) * 2 * c;
-                    const stp = sxq + 2 * a * b;
-                    const v = a * b * c;
-                    document.getElementById('hk-result').innerHTML = `<div class="solution-card card">
-                        ${MATH.step(1, MATH.expr(MATH.lbl('S<sub>xq</sub>'), MATH.eq(), MATH.txt('(' + a + ' + ' + b + ') × 2 × ' + c), MATH.eq(), MATH.val(sxq), MATH.unit('cm²')))}
-                        ${MATH.step(2, MATH.expr(MATH.lbl('S<sub>tp</sub>'), MATH.eq(), MATH.val(sxq), MATH.op('+'), MATH.txt('2 × ' + a + ' × ' + b), MATH.eq(), MATH.val(stp), MATH.unit('cm²')))}
-                        ${MATH.step(3, MATH.expr(MATH.lbl('V'), MATH.eq(), MATH.val(a), MATH.op('×'), MATH.val(b), MATH.op('×'), MATH.val(c), MATH.eq(), MATH.val(v), MATH.unit('cm³')))}
-                    </div>`;
-                });
-            } else if (tab === 'lp') {
-                addBox(2, 2, 2);
-                document.getElementById('hk-lp-calc').addEventListener('click', () => {
-                    const a = +document.getElementById('hk-lp-a').value;
-                    const scale = 4 / a;
-                    addBox(a * scale, a * scale, a * scale);
-                    const sxq = a * a * 4;
-                    const stp = a * a * 6;
-                    const v = a * a * a;
-                    document.getElementById('hk-lp-result').innerHTML = `<div class="solution-card card">
-                        ${MATH.step(1, MATH.expr(MATH.lbl('S<sub>xq</sub>'), MATH.eq(), MATH.val(a), MATH.op('×'), MATH.val(a), MATH.op('×'), MATH.val(4), MATH.eq(), MATH.val(sxq), MATH.unit('cm²')))}
-                        ${MATH.step(2, MATH.expr(MATH.lbl('S<sub>tp</sub>'), MATH.eq(), MATH.val(a), MATH.op('×'), MATH.val(a), MATH.op('×'), MATH.val(6), MATH.eq(), MATH.val(stp), MATH.unit('cm²')))}
-                        ${MATH.step(3, MATH.expr(MATH.lbl('V'), MATH.eq(), MATH.val(a + '³'), MATH.eq(), MATH.val(v), MATH.unit('cm³')))}
-                    </div>`;
-                });
-            } else if (tab === 'tru') {
-                addCylinder(1.5, 3.5);
-                document.getElementById('hk-tru-calc').addEventListener('click', () => {
-                    const r = +document.getElementById('hk-tru-r').value;
-                    const h = +document.getElementById('hk-tru-h').value;
-                    const PI = 3.14;
-                    const scale = 4 / Math.max(r * 2, h);
-                    addCylinder(r * scale, h * scale);
-                    const sxq = Math.round(2 * PI * r * h * 100) / 100;
-                    const stp = Math.round((sxq + 2 * PI * r * r) * 100) / 100;
-                    const v = Math.round(PI * r * r * h * 100) / 100;
-                    document.getElementById('hk-tru-result').innerHTML = `<div class="solution-card card">
-                        ${MATH.step(1, MATH.expr(MATH.lbl('S<sub>xq</sub>'), MATH.eq(), MATH.txt('2×3,14×' + r + '×' + h), MATH.eq(), MATH.val(sxq), MATH.unit('cm²')))}
-                        ${MATH.step(2, MATH.expr(MATH.lbl('S<sub>tp</sub>'), MATH.eq(), MATH.val(sxq), MATH.op('+'), MATH.txt('2×3,14×' + r + '²'), MATH.eq(), MATH.val(stp), MATH.unit('cm²')))}
-                        ${MATH.step(3, MATH.expr(MATH.lbl('V'), MATH.eq(), MATH.txt('3,14×' + r + '²×' + h), MATH.eq(), MATH.val(v), MATH.unit('cm³')))}
-                    </div>`;
-                });
+        startBuild() {
+            if (isBuilding) return;
+            isBuilding = true;
+            buildProgress = 0;
+            const btn = document.getElementById('hk-btn-build');
+            if (btn) btn.textContent = '⏳ Đang dựng...';
+            const duration = 5000, start = performance.now();
+            function step(now) {
+                buildProgress = Math.min((now - start) / duration, 1);
+                const t = buildProgress < 0.5 ? 4 * buildProgress * buildProgress * buildProgress : 1 - Math.pow(-2 * buildProgress + 2, 3) / 2;
+                buildShape(t);
+                updateFormula(t);
+                const pb = document.getElementById('hk-progress');
+                if (pb) pb.style.width = (buildProgress * 100) + '%';
+                if (buildProgress < 1) { buildAnimId = requestAnimationFrame(step); }
+                else { isBuilding = false; if (btn) btn.textContent = '✅ Hoàn thành!'; setTimeout(() => { if (btn) btn.textContent = '▶️ Dựng lại'; }, 2000); }
             }
+            buildAnimId = requestAnimationFrame(step);
         },
 
-        bindDonVi() {
-            document.getElementById('hk-dv-calc')?.addEventListener('click', () => {
-                const val = +document.getElementById('hk-dv-val').value;
-                const from = document.getElementById('hk-dv-from').value;
-                const to = document.getElementById('hk-dv-to').value;
-                const toCm3 = { m3: 1e6, dm3: 1000, cm3: 1 };
-                const cm3Val = val * toCm3[from];
-                const result = cm3Val / toCm3[to];
-                const names = { m3: 'm³', dm3: 'dm³', cm3: 'cm³' };
-                document.getElementById('hk-dv-result').innerHTML =
-                    MATH.answer(MATH.expr(MATH.val(val), MATH.txt(names[from]), MATH.eq(), MATH.val(result.toLocaleString('vi-VN')), MATH.txt(names[to])));
-            });
+        resetBuild() {
+            if (buildAnimId) cancelAnimationFrame(buildAnimId);
+            isBuilding = false; buildProgress = 0;
+            clearLabels();
+            const pb = document.getElementById('hk-progress');
+            if (pb) pb.style.width = '0%';
+            const btn = document.getElementById('hk-btn-build');
+            if (btn) btn.textContent = '▶️ Bắt đầu dựng hình';
+            buildShape(0); updateFormula(0);
         },
 
-        destroy() { cleanup3D(); }
+        resetCamera() {
+            if (!camera || !camera._defaultPos) return;
+            const sp = camera.position.clone(), st = controls.target.clone(), ep = camera._defaultPos.clone(), et = camera._defaultTarget.clone();
+            const dur = 600, t0 = performance.now();
+            function anim(now) { const p = Math.min((now - t0) / dur, 1), e = 1 - Math.pow(1 - p, 3); camera.position.lerpVectors(sp, ep, e); controls.target.lerpVectors(st, et, e); controls.update(); if (p < 1) requestAnimationFrame(anim); }
+            requestAnimationFrame(anim);
+        },
+
+        destroy() {
+            if (buildAnimId) cancelAnimationFrame(buildAnimId);
+            if (animLoopId) cancelAnimationFrame(animLoopId);
+            if (renderer) { renderer.dispose(); renderer = null; }
+            if (scene) {
+                scene.traverse(obj => { if (obj.geometry) obj.geometry.dispose(); if (obj.material) { if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose()); else obj.material.dispose(); } });
+                scene = null;
+            }
+            camera = null; controls = null;
+        }
     };
+
+    window.ModuleHinhKhoi = MOD;
     APP.register('hinh-khoi', MOD);
 })();
