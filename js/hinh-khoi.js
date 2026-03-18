@@ -72,6 +72,36 @@
         }
     }
 
+    function getPerimeter() {
+        const d = dims[currentShape];
+        switch (currentShape) {
+            case 'box': return 2 * (d.w + d.d);
+            case 'triangle': {
+                const halfA = d.a / 2;
+                const sideLen = Math.sqrt(halfA * halfA + d.b * d.b);
+                return d.a + 2 * sideLen;
+            }
+            case 'circle': return 2 * Math.PI * d.r;
+            case 'pentagon': return 5 * 2 * d.r * Math.sin(Math.PI / 5);
+            case 'hexagon': return 6 * d.r;
+            case 'star': {
+                const inner = d.r * 0.45;
+                let perim = 0;
+                for (let i = 0; i < 10; i++) {
+                    const a1 = (i / 10) * Math.PI * 2, a2 = ((i + 1) / 10) * Math.PI * 2;
+                    const r1 = (i % 2 === 0) ? d.r : inner, r2 = ((i + 1) % 2 === 0) ? d.r : inner;
+                    const dx = r2 * Math.cos(a2) - r1 * Math.cos(a1), dy = r2 * Math.sin(a2) - r1 * Math.sin(a1);
+                    perim += Math.sqrt(dx * dx + dy * dy);
+                }
+                return perim;
+            }
+            case 'ellipse': {
+                const a = d.rx, b = d.ry;
+                return Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b)));
+            }
+        }
+    }
+
     /* ── Labels ── */
     function makeLabel(text, color = '#fff', fs = 40) {
         const c = document.createElement('canvas'), ctx = c.getContext('2d');
@@ -190,54 +220,82 @@
         const el = document.getElementById('hk-formula');
         const explain = document.getElementById('hk-explain');
         if (!el) return;
-        const d = dims[currentShape], ba = getBaseArea(), vol = ba * d.h * progress, name = shapeNames[currentShape];
+        const d = dims[currentShape], ba = getBaseArea(), perim = getPerimeter();
+        const vol = ba * d.h * progress, name = shapeNames[currentShape];
+        const sxq = perim * d.h * progress;
+        const stp = sxq + 2 * ba;
 
-        let areaExpr = '';
-        let areaDetail = '';
+        let areaExpr = '', perimExpr = '', areaDetail = '';
         switch (currentShape) {
             case 'box':
-                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.val(d.w), MATH.op('×'), MATH.val(d.d), MATH.eq(), MATH.val(ba.toFixed(1)));
+                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.val(d.w), MATH.op('×'), MATH.val(d.d), MATH.eq(), MATH.val(ba.toFixed(1)));
+                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.txt('('), MATH.val(d.w), MATH.op('+'), MATH.val(d.d), MATH.txt(')'), MATH.op('×'), MATH.val(2), MATH.eq(), MATH.val(perim.toFixed(1)));
                 areaDetail = `hình chữ nhật (${d.w} × ${d.d})`;
                 break;
             case 'triangle':
-                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.frac(`${d.a} × ${d.b}`, 2), MATH.eq(), MATH.val(ba.toFixed(1)));
+                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.frac(`${d.a} × ${d.b}`, 2), MATH.eq(), MATH.val(ba.toFixed(1)));
+                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(perim.toFixed(2)));
                 areaDetail = `tam giác (đáy ${d.a}, cao ${d.b})`;
                 break;
             case 'circle':
-                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.r + '²'), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.r + '²'), MATH.eq(), MATH.val(ba.toFixed(2)));
+                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(2), MATH.op('×'), MATH.txt('π'), MATH.op('×'), MATH.val(d.r), MATH.eq(), MATH.val(perim.toFixed(2)));
                 areaDetail = `hình tròn (r = ${d.r})`;
                 break;
             case 'pentagon':
-                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.frac(`5 × ${d.r}² × sin72°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.frac(`5 × ${d.r}² × sin72°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
+                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(perim.toFixed(2)));
                 areaDetail = `ngũ giác đều (r = ${d.r})`;
                 break;
             case 'hexagon':
-                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.frac(`6 × ${d.r}² × sin60°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.frac(`6 × ${d.r}² × sin60°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
+                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(6), MATH.op('×'), MATH.val(d.r), MATH.eq(), MATH.val(perim.toFixed(2)));
                 areaDetail = `lục giác đều (r = ${d.r})`;
                 break;
             case 'star':
-                areaExpr = MATH.expr(MATH.lbl('S'), MATH.txt('(ngôi sao)'), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.txt('(ngôi sao)'), MATH.eq(), MATH.val(ba.toFixed(2)));
+                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(perim.toFixed(2)));
                 areaDetail = `ngôi sao 5 cánh (R = ${d.r})`;
                 break;
             case 'ellipse':
-                areaExpr = MATH.expr(MATH.lbl('S'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.rx), MATH.op('×'), MATH.val(d.ry), MATH.eq(), MATH.val(ba.toFixed(2)));
+                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.rx), MATH.op('×'), MATH.val(d.ry), MATH.eq(), MATH.val(ba.toFixed(2)));
+                perimExpr = MATH.expr(MATH.lbl('P'), MATH.txt('≈'), MATH.val(perim.toFixed(2)));
                 areaDetail = `hình elip (a = ${d.rx}, b = ${d.ry})`;
                 break;
         }
 
         el.innerHTML = `
         ${MATH.step(1, '<span class="txt">Diện tích đáy:</span> ' + areaExpr)}
-        ${MATH.step(2, MATH.expr(
+        ${MATH.step(2, '<span class="txt">Chu vi đáy:</span> ' + perimExpr)}
+        ${MATH.step(3, MATH.expr(
+            MATH.lbl('S<sub>xq</sub>'), MATH.eq(),
+            MATH.lbl('P'), MATH.op('×'), MATH.lbl('h'), MATH.eq(),
+            MATH.val(perim.toFixed(1)), MATH.op('×'), MATH.val((d.h * progress).toFixed(1)), MATH.eq(),
+            MATH.val(sxq.toFixed(1))
+        ))}
+        ${MATH.step(4, MATH.expr(
+            MATH.lbl('S<sub>tp</sub>'), MATH.eq(),
+            MATH.lbl('S<sub>xq</sub>'), MATH.op('+'), MATH.val(2), MATH.op('×'), MATH.lbl('S<sub>đáy</sub>'), MATH.eq(),
+            MATH.val(sxq.toFixed(1)), MATH.op('+'), MATH.val((2 * ba).toFixed(1)), MATH.eq(),
+            MATH.val(stp.toFixed(1))
+        ))}
+        ${MATH.step(5, MATH.expr(
             MATH.lbl('V'), MATH.eq(),
             MATH.lbl('S<sub>đáy</sub>'), MATH.op('×'), MATH.lbl('h'), MATH.eq(),
             MATH.val(ba.toFixed(1)), MATH.op('×'), MATH.val((d.h * progress).toFixed(1)), MATH.eq(),
             MATH.val(vol.toFixed(1))
         ))}
-        ${progress >= 1 ? MATH.answer(MATH.lbl('V') + MATH.eq() + MATH.val((ba * d.h).toFixed(1))) : ''}
+        ${progress >= 1 ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1)">' +
+                MATH.answer(MATH.lbl('S<sub>xq</sub>') + MATH.eq() + MATH.val((perim * d.h).toFixed(1))) + '<br>' +
+                MATH.answer(MATH.lbl('S<sub>tp</sub>') + MATH.eq() + MATH.val((perim * d.h + 2 * ba).toFixed(1))) + '<br>' +
+                MATH.answer(MATH.lbl('V') + MATH.eq() + MATH.val((ba * d.h).toFixed(1))) +
+                '</div>' : ''}
     `;
 
         if (explain) {
             explain.innerHTML = `<strong>${name}</strong> — mặt đáy ${areaDetail}, kéo lên theo <span class="f-pink">h = ${d.h}</span>.<br>
+        📐 <span class="f-yellow">S<sub>xq</sub></span> = chu vi đáy × h = <strong>${(perim * d.h).toFixed(1)}</strong><br>
+        📐 <span class="f-green">S<sub>tp</sub></span> = S<sub>xq</sub> + 2 × S<sub>đáy</sub> = <strong>${(perim * d.h + 2 * ba).toFixed(1)}</strong><br>
         🔑 ${MATH.expr(MATH.lbl('V'), MATH.eq(), MATH.lbl('S<sub>đáy</sub>'), MATH.op('×'), MATH.lbl('h'), MATH.eq(), MATH.val((ba * d.h).toFixed(1)))}`;
         }
     }

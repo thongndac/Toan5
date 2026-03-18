@@ -118,6 +118,12 @@
             ctx.setLineDash([12, 8]); ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
             ctx.setLineDash([]);
+            // Midpoint marker (1/2 quãng đường)
+            const midX = w / 2;
+            ctx.strokeStyle = 'rgba(148,163,184,0.5)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(midX, h / 2 - 12); ctx.lineTo(midX, h / 2 + 12); ctx.stroke();
+            ctx.fillStyle = '#94a3b8'; ctx.font = '10px Nunito'; ctx.textAlign = 'center';
+            ctx.fillText(`${Math.round(dist / 2)}km`, midX, h / 2 + 24);
             // Car
             ctx.fillStyle = '#60a5fa'; ctx.fillRect(x, h / 2 - 22, 40, 18);
             ctx.fillStyle = '#93c5fd'; ctx.fillRect(x + 8, h / 2 - 32, 24, 12);
@@ -193,7 +199,6 @@
         cancelAnim();
         const ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
         const roadY = h / 2;
-        const meetX = 40 + (w - 80) * (v1 / (v1 + v2));
         let x1 = 40, x2 = w - 40;
         const speed1 = 1.5 * (v1 / (v1 + v2 || 1));
         const speed2 = 1.5 * (v2 / (v1 + v2 || 1));
@@ -206,6 +211,12 @@
             ctx.setLineDash([12, 8]); ctx.strokeStyle = '#475569'; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(0, roadY); ctx.lineTo(w, roadY); ctx.stroke();
             ctx.setLineDash([]);
+            // Midpoint marker (1/2 quãng đường)
+            const midX = w / 2;
+            ctx.strokeStyle = 'rgba(148,163,184,0.5)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(midX, roadY - 12); ctx.lineTo(midX, roadY + 12); ctx.stroke();
+            ctx.fillStyle = '#94a3b8'; ctx.font = '10px Nunito'; ctx.textAlign = 'center';
+            ctx.fillText(`${Math.round(s / 2)}km`, midX, roadY + 24);
             // Labels
             ctx.fillStyle = '#94a3b8'; ctx.font = '13px Nunito'; ctx.textAlign = 'center';
             ctx.fillText('A', 30, h - 6); ctx.fillText('B', w - 30, h - 6);
@@ -229,14 +240,12 @@
                 x1 += speed1; x2 -= speed2;
                 if (x1 + 36 >= x2 - 36) {
                     met = true;
-                    // Flash
                     ctx.fillStyle = '#34d399'; ctx.font = 'bold 16px Nunito';
                     ctx.fillText('🤝 GẶP NHAU!', (x1 + x2) / 2, roadY + 30);
                 }
             } else {
                 ctx.fillStyle = '#34d399'; ctx.font = 'bold 16px Nunito';
                 ctx.fillText('🤝 GẶP NHAU!', (x1 + x2) / 2, roadY + 30);
-                // Reset after pause
                 setTimeout(() => { x1 = 40; x2 = w - 40; met = false; }, 2000);
             }
             animId = requestAnimationFrame(draw);
@@ -319,9 +328,15 @@
             ctx.setLineDash([12, 8]); ctx.strokeStyle = '#475569'; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(0, roadY); ctx.lineTo(w, roadY); ctx.stroke();
             ctx.setLineDash([]);
+            // Midpoint marker (1/2 khoảng cách ban đầu)
+            const gapMidX = (40 + 200) / 2;
+            ctx.strokeStyle = 'rgba(148,163,184,0.5)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(gapMidX, roadY - 12); ctx.lineTo(gapMidX, roadY + 12); ctx.stroke();
+            ctx.fillStyle = '#94a3b8'; ctx.font = '10px Nunito'; ctx.textAlign = 'center';
+            ctx.fillText(`${Math.round(dist / 2)}km`, gapMidX, roadY + 24);
             // Distance label
             ctx.fillStyle = '#fbbf24'; ctx.font = '12px Nunito'; ctx.textAlign = 'center';
-            ctx.fillText(`← ${dist}km →`, (x1 + x2) / 2, h - 6);
+            ctx.fillText(`← ${dist}km →`, 120, h - 6);
             // Car 1 (chaser, blue, faster)
             ctx.fillStyle = '#60a5fa'; ctx.fillRect(x1, roadY - 22, 36, 16);
             ctx.fillStyle = '#93c5fd'; ctx.fillRect(x1 + 6, roadY - 30, 20, 10);
@@ -330,7 +345,7 @@
             ctx.beginPath(); ctx.arc(x1 + 28, roadY, 4, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#60a5fa'; ctx.font = 'bold 11px Nunito';
             ctx.fillText(`${v1}km/h →`, x1 + 18, roadY - 36);
-            // Car 2 (prey, pink, slower)
+            // Car 2 (prey, orange, slower)
             ctx.fillStyle = '#fb923c'; ctx.fillRect(x2, roadY - 22, 36, 16);
             ctx.fillStyle = '#fdba74'; ctx.fillRect(x2 + 6, roadY - 30, 20, 10);
             ctx.fillStyle = '#1e293b';
