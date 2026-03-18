@@ -10,7 +10,8 @@
     let baseMesh = null, bodyMesh = null, topMesh = null, edgeLines = null;
     let extraMeshes = [], labelSprites = [], gridHelper = null;
     let animLoopId = null;
-    let matBase, matBody, matTop, matEdge;
+    let matBase, matBody, matTop, matEdge, matCapHidden;
+    let currentUnit = 'cm';
 
     const dims = {
         box: { w: 5, d: 3, h: 4 },
@@ -161,34 +162,34 @@
 
     function addDimensionLabels(progress) {
         clearLabels();
-        const d = dims[currentShape], h = d.h * progress;
+        const d = dims[currentShape], h = d.h * progress, uu = currentUnit;
         addVertexLabels(progress);
         if (h > 0.15) {
-            const lh = makeLabel(`h = ${h.toFixed(1)}`, '#f472b6');
+            const lh = makeLabel(`h=${h.toFixed(1)}${uu}`, '#f472b6');
             const offX = currentShape === 'box' ? -d.w / 2 - 1.4 : currentShape === 'triangle' ? d.a / 2 + 1.4 : currentShape === 'ellipse' ? -d.rx - 0.8 : -(d.r || 3) - 1.2;
             const offZ = currentShape === 'box' ? -d.d / 2 - 0.3 : 0;
             lh.position.set(offX, h / 2, offZ); addObj(lh);
             addObj(makeArrowLine(new THREE.Vector3(offX + 0.4, 0, offZ), new THREE.Vector3(offX + 0.4, h, offZ), 0xf472b6));
         }
         if (currentShape === 'box') {
-            const la = makeLabel(`a = ${d.w}`, '#60a5fa'); la.position.set(0, -0.7, d.d / 2 + 0.8); addObj(la);
-            const lb = makeLabel(`b = ${d.d}`, '#34d399'); lb.position.set(d.w / 2 + 0.8, -0.7, 0); addObj(lb);
+            const la = makeLabel(`a=${d.w}${uu}`, '#60a5fa'); la.position.set(0, -0.7, d.d / 2 + 0.8); addObj(la);
+            const lb = makeLabel(`b=${d.d}${uu}`, '#34d399'); lb.position.set(d.w / 2 + 0.8, -0.7, 0); addObj(lb);
         } else if (currentShape === 'triangle') {
-            const la = makeLabel(`a = ${d.a}`, '#60a5fa'); la.position.set(0, -0.7, 0.8); addObj(la);
-            const lb = makeLabel(`b = ${d.b}`, '#34d399'); lb.position.set(-d.a / 2 - 1.2, -0.7, -d.b / 2); addObj(lb);
+            const la = makeLabel(`a=${d.a}${uu}`, '#60a5fa'); la.position.set(0, -0.7, 0.8); addObj(la);
+            const lb = makeLabel(`b=${d.b}${uu}`, '#34d399'); lb.position.set(-d.a / 2 - 1.2, -0.7, -d.b / 2); addObj(lb);
         } else if (currentShape === 'circle') {
-            const lr = makeLabel(`r = ${d.r}`, '#60a5fa'); lr.position.set(d.r / 2, -0.5, 0.6); addObj(lr);
+            const lr = makeLabel(`r=${d.r}${uu}`, '#60a5fa'); lr.position.set(d.r / 2, -0.5, 0.6); addObj(lr);
             addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(d.r, 0.02, 0), 0x60a5fa));
         } else if (currentShape === 'pentagon' || currentShape === 'hexagon') {
-            const lr = makeLabel(`r = ${d.r}`, '#60a5fa'); lr.position.set(0, -0.7, d.r + 0.8); addObj(lr);
+            const lr = makeLabel(`r=${d.r}${uu}`, '#60a5fa'); lr.position.set(0, -0.7, d.r + 0.8); addObj(lr);
             addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(d.r, 0.02, 0), 0x60a5fa));
         } else if (currentShape === 'star') {
-            const lr = makeLabel(`R = ${d.r}`, '#60a5fa'); lr.position.set(d.r / 2, -0.5, d.r + 0.4); addObj(lr);
+            const lr = makeLabel(`R=${d.r}${uu}`, '#60a5fa'); lr.position.set(d.r / 2, -0.5, d.r + 0.4); addObj(lr);
             addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(d.r * Math.cos(-Math.PI / 2), 0.02, d.r * Math.sin(-Math.PI / 2)), 0x60a5fa));
         } else if (currentShape === 'ellipse') {
-            const la = makeLabel(`a = ${d.rx}`, '#60a5fa'); la.position.set(d.rx / 2, -0.5, d.ry + 0.4); addObj(la);
+            const la = makeLabel(`a=${d.rx}${uu}`, '#60a5fa'); la.position.set(d.rx / 2, -0.5, d.ry + 0.4); addObj(la);
             addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(d.rx, 0.02, 0), 0x60a5fa));
-            const lb = makeLabel(`b = ${d.ry}`, '#34d399'); lb.position.set(-d.rx - 0.6, -0.5, d.ry / 2); addObj(lb);
+            const lb = makeLabel(`b=${d.ry}${uu}`, '#34d399'); lb.position.set(-d.rx - 0.6, -0.5, d.ry / 2); addObj(lb);
             addObj(makeArrowLine(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(0, 0.02, d.ry), 0x34d399));
         }
     }
@@ -203,12 +204,18 @@
         clearShape();
         const d = dims[currentShape], h = d.h * progress, shape = getBaseShape();
         const baseGeo = new THREE.ShapeGeometry(shape);
-        baseMesh = new THREE.Mesh(baseGeo, matBase); baseMesh.rotation.x = -Math.PI / 2; baseMesh.position.y = 0.005; scene.add(baseMesh);
+        baseMesh = new THREE.Mesh(baseGeo, matBase);
+        baseMesh.rotation.x = -Math.PI / 2; baseMesh.position.y = 0.02;
+        baseMesh.renderOrder = 1; scene.add(baseMesh);
         if (h > 0.01) {
             const extGeo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
-            bodyMesh = new THREE.Mesh(extGeo, matBody); bodyMesh.rotation.x = -Math.PI / 2; scene.add(bodyMesh);
+            // Multi-material: group 0 = caps (hidden), group 1 = sides (matBody)
+            bodyMesh = new THREE.Mesh(extGeo, [matCapHidden, matBody]);
+            bodyMesh.rotation.x = -Math.PI / 2; scene.add(bodyMesh);
             const topGeo = new THREE.ShapeGeometry(shape);
-            topMesh = new THREE.Mesh(topGeo, matTop); topMesh.rotation.x = -Math.PI / 2; topMesh.position.y = h; scene.add(topMesh);
+            topMesh = new THREE.Mesh(topGeo, matTop);
+            topMesh.rotation.x = -Math.PI / 2; topMesh.position.y = h;
+            topMesh.renderOrder = 1; scene.add(topMesh);
             const edges = new THREE.EdgesGeometry(extGeo);
             edgeLines = new THREE.LineSegments(edges, matEdge); edgeLines.rotation.x = -Math.PI / 2; scene.add(edgeLines);
         }
@@ -225,78 +232,87 @@
         const sxq = perim * d.h * progress;
         const stp = sxq + 2 * ba;
 
-        let areaExpr = '', perimExpr = '', areaDetail = '';
+        const u = currentUnit, u2 = u + '²', u3 = u + '³';
+
+        // Build formula with inline units
+        let sdayStep = '', perimStep = '', sxqStep = '', stpStep = '', volStep = '';
+        const hVal = (d.h * progress).toFixed(1);
+
         switch (currentShape) {
             case 'box':
-                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.val(d.w), MATH.op('×'), MATH.val(d.d), MATH.eq(), MATH.val(ba.toFixed(1)));
-                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.txt('('), MATH.val(d.w), MATH.op('+'), MATH.val(d.d), MATH.txt(')'), MATH.op('×'), MATH.val(2), MATH.eq(), MATH.val(perim.toFixed(1)));
-                areaDetail = `hình chữ nhật (${d.w} × ${d.d})`;
+                sdayStep = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.val(`${d.w}${u}`), MATH.op('×'), MATH.val(`${d.d}${u}`), MATH.eq(), MATH.val(ba.toFixed(1)), MATH.unit(u2));
+                perimStep = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.txt('('), MATH.val(`${d.w}${u}`), MATH.op('+'), MATH.val(`${d.d}${u}`), MATH.txt(')'), MATH.op('×'), MATH.val(2), MATH.eq(), MATH.val(perim.toFixed(1)), MATH.unit(u));
                 break;
             case 'triangle':
-                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.frac(`${d.a} × ${d.b}`, 2), MATH.eq(), MATH.val(ba.toFixed(1)));
-                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(perim.toFixed(2)));
-                areaDetail = `tam giác (đáy ${d.a}, cao ${d.b})`;
+                sdayStep = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.frac(`${d.a}${u} × ${d.b}${u}`, 2), MATH.eq(), MATH.val(ba.toFixed(1)), MATH.unit(u2));
+                perimStep = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(perim.toFixed(2)), MATH.unit(u));
                 break;
             case 'circle':
-                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.r + '²'), MATH.eq(), MATH.val(ba.toFixed(2)));
-                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(2), MATH.op('×'), MATH.txt('π'), MATH.op('×'), MATH.val(d.r), MATH.eq(), MATH.val(perim.toFixed(2)));
-                areaDetail = `hình tròn (r = ${d.r})`;
+                sdayStep = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(`${d.r}${u}`), MATH.op('×'), MATH.val(`${d.r}${u}`), MATH.eq(), MATH.val(ba.toFixed(2)), MATH.unit(u2));
+                perimStep = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(2), MATH.op('×'), MATH.txt('π'), MATH.op('×'), MATH.val(`${d.r}${u}`), MATH.eq(), MATH.val(perim.toFixed(2)), MATH.unit(u));
                 break;
             case 'pentagon':
-                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.frac(`5 × ${d.r}² × sin72°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
-                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(perim.toFixed(2)));
-                areaDetail = `ngũ giác đều (r = ${d.r})`;
+                sdayStep = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.frac(`5 × (${d.r}${u})² × sin72°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)), MATH.unit(u2));
+                perimStep = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(perim.toFixed(2)), MATH.unit(u));
                 break;
             case 'hexagon':
-                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.frac(`6 × ${d.r}² × sin60°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)));
-                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(6), MATH.op('×'), MATH.val(d.r), MATH.eq(), MATH.val(perim.toFixed(2)));
-                areaDetail = `lục giác đều (r = ${d.r})`;
+                sdayStep = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.frac(`6 × (${d.r}${u})² × sin60°`, 2), MATH.eq(), MATH.val(ba.toFixed(2)), MATH.unit(u2));
+                perimStep = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(6), MATH.op('×'), MATH.val(`${d.r}${u}`), MATH.eq(), MATH.val(perim.toFixed(2)), MATH.unit(u));
                 break;
             case 'star':
-                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.txt('(ngôi sao)'), MATH.eq(), MATH.val(ba.toFixed(2)));
-                perimExpr = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(perim.toFixed(2)));
-                areaDetail = `ngôi sao 5 cánh (R = ${d.r})`;
+                sdayStep = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.txt('(ngôi sao)'), MATH.eq(), MATH.val(ba.toFixed(2)), MATH.unit(u2));
+                perimStep = MATH.expr(MATH.lbl('P'), MATH.eq(), MATH.val(perim.toFixed(2)), MATH.unit(u));
                 break;
             case 'ellipse':
-                areaExpr = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(d.rx), MATH.op('×'), MATH.val(d.ry), MATH.eq(), MATH.val(ba.toFixed(2)));
-                perimExpr = MATH.expr(MATH.lbl('P'), MATH.txt('≈'), MATH.val(perim.toFixed(2)));
-                areaDetail = `hình elip (a = ${d.rx}, b = ${d.ry})`;
+                sdayStep = MATH.expr(MATH.lbl('S<sub>đáy</sub>'), MATH.eq(), MATH.txt('π'), MATH.op('×'), MATH.val(`${d.rx}${u}`), MATH.op('×'), MATH.val(`${d.ry}${u}`), MATH.eq(), MATH.val(ba.toFixed(2)), MATH.unit(u2));
+                perimStep = MATH.expr(MATH.lbl('P'), MATH.txt('≈'), MATH.val(perim.toFixed(2)), MATH.unit(u));
                 break;
         }
 
-        el.innerHTML = `
-        ${MATH.step(1, '<span class="txt">Diện tích đáy:</span> ' + areaExpr)}
-        ${MATH.step(2, '<span class="txt">Chu vi đáy:</span> ' + perimExpr)}
-        ${MATH.step(3, MATH.expr(
+        sxqStep = MATH.expr(
             MATH.lbl('S<sub>xq</sub>'), MATH.eq(),
-            MATH.lbl('P'), MATH.op('×'), MATH.lbl('h'), MATH.eq(),
-            MATH.val(perim.toFixed(1)), MATH.op('×'), MATH.val((d.h * progress).toFixed(1)), MATH.eq(),
-            MATH.val(sxq.toFixed(1))
-        ))}
-        ${MATH.step(4, MATH.expr(
+            MATH.val(`${perim.toFixed(1)}${u}`), MATH.op('×'), MATH.val(`${hVal}${u}`), MATH.eq(),
+            MATH.val(sxq.toFixed(1)), MATH.unit(u2)
+        );
+        stpStep = MATH.expr(
             MATH.lbl('S<sub>tp</sub>'), MATH.eq(),
-            MATH.lbl('S<sub>xq</sub>'), MATH.op('+'), MATH.val(2), MATH.op('×'), MATH.lbl('S<sub>đáy</sub>'), MATH.eq(),
-            MATH.val(sxq.toFixed(1)), MATH.op('+'), MATH.val((2 * ba).toFixed(1)), MATH.eq(),
-            MATH.val(stp.toFixed(1))
-        ))}
-        ${MATH.step(5, MATH.expr(
+            MATH.val(`${sxq.toFixed(1)}${u2}`), MATH.op('+'), MATH.val(2), MATH.op('×'), MATH.val(`${ba.toFixed(1)}${u2}`), MATH.eq(),
+            MATH.val(stp.toFixed(1)), MATH.unit(u2)
+        );
+        volStep = MATH.expr(
             MATH.lbl('V'), MATH.eq(),
-            MATH.lbl('S<sub>đáy</sub>'), MATH.op('×'), MATH.lbl('h'), MATH.eq(),
-            MATH.val(ba.toFixed(1)), MATH.op('×'), MATH.val((d.h * progress).toFixed(1)), MATH.eq(),
-            MATH.val(vol.toFixed(1))
-        ))}
+            MATH.val(`${ba.toFixed(1)}${u2}`), MATH.op('×'), MATH.val(`${hVal}${u}`), MATH.eq(),
+            MATH.val(vol.toFixed(1)), MATH.unit(u3)
+        );
+
+        el.innerHTML = `
+        ${MATH.step(1, '<span class="txt">➀ Diện tích đáy:</span> ' + sdayStep)}
+        ${MATH.step(2, '<span class="txt">➁ Chu vi đáy:</span> ' + perimStep)}
+        ${MATH.step(3, '<span class="txt">➂ <span style="color:#f59e0b">Diện tích xung quanh</span>:</span> ' + sxqStep)}
+        ${MATH.step(4, '<span class="txt">➃ <span style="color:#34d399">Diện tích toàn phần</span>:</span> ' + stpStep)}
+        ${MATH.step(5, '<span class="txt">➄ Thể tích:</span> ' + volStep)}
         ${progress >= 1 ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1)">' +
-                MATH.answer(MATH.lbl('S<sub>xq</sub>') + MATH.eq() + MATH.val((perim * d.h).toFixed(1))) + '<br>' +
-                MATH.answer(MATH.lbl('S<sub>tp</sub>') + MATH.eq() + MATH.val((perim * d.h + 2 * ba).toFixed(1))) + '<br>' +
-                MATH.answer(MATH.lbl('V') + MATH.eq() + MATH.val((ba * d.h).toFixed(1))) +
+                MATH.answer('<span style="color:#f59e0b">S<sub>xq</sub></span>' + MATH.eq() + MATH.val((perim * d.h).toFixed(1)) + MATH.unit(u2)) + '<br>' +
+                MATH.answer('<span style="color:#34d399">S<sub>tp</sub></span>' + MATH.eq() + MATH.val((perim * d.h + 2 * ba).toFixed(1)) + MATH.unit(u2)) + '<br>' +
+                MATH.answer(MATH.lbl('V') + MATH.eq() + MATH.val((ba * d.h).toFixed(1)) + MATH.unit(u3)) +
                 '</div>' : ''}
     `;
 
         if (explain) {
-            explain.innerHTML = `<strong>${name}</strong> — mặt đáy ${areaDetail}, kéo lên theo <span class="f-pink">h = ${d.h}</span>.<br>
-        📐 <span class="f-yellow">S<sub>xq</sub></span> = chu vi đáy × h = <strong>${(perim * d.h).toFixed(1)}</strong><br>
-        📐 <span class="f-green">S<sub>tp</sub></span> = S<sub>xq</sub> + 2 × S<sub>đáy</sub> = <strong>${(perim * d.h + 2 * ba).toFixed(1)}</strong><br>
-        🔑 ${MATH.expr(MATH.lbl('V'), MATH.eq(), MATH.lbl('S<sub>đáy</sub>'), MATH.op('×'), MATH.lbl('h'), MATH.eq(), MATH.val((ba * d.h).toFixed(1)))}`;
+            const areaDetail = shapeNames[currentShape];
+            explain.innerHTML = `<strong>${areaDetail}</strong> (${d.h}${u} cao)<br>
+        <div style="margin:6px 0;padding:8px 10px;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;border-radius:4px">
+            🟠 <strong>Diện tích xung quanh</strong> = chu vi đáy × chiều cao<br>
+            <span style="padding-left:24px">= ${perim.toFixed(1)}${u} × ${d.h}${u} = <strong>${(perim * d.h).toFixed(1)} (${u2})</strong></span>
+        </div>
+        <div style="margin:6px 0;padding:8px 10px;background:rgba(52,211,153,0.1);border-left:3px solid #34d399;border-radius:4px">
+            🟢 <strong>Diện tích toàn phần</strong> = S<sub>xq</sub> + 2 × S<sub>đáy</sub><br>
+            <span style="padding-left:24px">= ${(perim * d.h).toFixed(1)}${u2} + 2 × ${ba.toFixed(1)}${u2} = <strong>${(perim * d.h + 2 * ba).toFixed(1)} (${u2})</strong></span>
+        </div>
+        <div style="margin:6px 0;padding:8px 10px;background:rgba(167,139,250,0.1);border-left:3px solid #a78bfa;border-radius:4px">
+            🟣 <strong>Thể tích</strong> = S<sub>đáy</sub> × chiều cao<br>
+            <span style="padding-left:24px">= ${ba.toFixed(1)}${u2} × ${d.h}${u} = <strong>${(ba * d.h).toFixed(1)} (${u3})</strong></span>
+        </div>`;
         }
     }
     /* ── Sliders ── */
@@ -335,15 +351,24 @@
         scene.add(new THREE.PointLight(0x60a5fa, 0.4, 30).translateX(-5).translateY(8));
         gridHelper = new THREE.GridHelper(14, 14, 0x333366, 0x222244); gridHelper.position.y = -0.01; scene.add(gridHelper);
 
+        // S đáy = BLUE (top + bottom) — separate meshes
         matBase = new THREE.MeshPhysicalMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.6, roughness: 0.3, metalness: 0.1, side: THREE.DoubleSide });
-        matBody = new THREE.MeshPhysicalMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.35, roughness: 0.2, metalness: 0.05, side: THREE.DoubleSide });
-        matTop = new THREE.MeshPhysicalMaterial({ color: 0x34d399, transparent: true, opacity: 0.5, roughness: 0.3, metalness: 0.1, side: THREE.DoubleSide });
+        matTop = new THREE.MeshPhysicalMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.55, roughness: 0.3, metalness: 0.1, side: THREE.DoubleSide });
+        // Hidden cap material — makes ExtrudeGeometry caps invisible
+        matCapHidden = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+        // S xung quanh = ORANGE (side walls only via ExtrudeGeometry group 1)
+        matBody = new THREE.MeshPhysicalMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.3, roughness: 0.2, metalness: 0.05, side: THREE.DoubleSide });
         matEdge = new THREE.LineBasicMaterial({ color: 0xfbbf24, linewidth: 2 });
 
         function resize() { renderer.setSize(parent.clientWidth, parent.clientHeight); camera.aspect = parent.clientWidth / parent.clientHeight; camera.updateProjectionMatrix(); }
         resize(); window.addEventListener('resize', resize);
-        (function loop() { animLoopId = requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+        (function loop() {
+            animLoopId = requestAnimationFrame(loop);
+            controls.update();
+            renderer.render(scene, camera);
+        })();
     }
+
 
     const MOD = {
         render(el) {
@@ -351,7 +376,11 @@
                 <div class="section-header slide-up">
                     <h2>🧊 Hình Khối 3D</h2>
                     <p>Mọi hình khối = "kéo" mặt đáy lên theo chiều cao!</p>
-                    <div class="formula-badge"><span class="f-purple">V</span> = <span class="f-yellow">S<sub>đáy</sub></span> × <span class="f-pink">h</span></div>
+                    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                        <div class="formula-badge" style="opacity:0.9"><span style="color:#60a5fa">S<sub>xq</sub></span> = <span style="color:#f59e0b">P</span> × <span style="color:#f472b6">h</span></div>
+                        <div class="formula-badge" style="opacity:0.9"><span style="color:#34d399">S<sub>tp</sub></span> = <span style="color:#60a5fa">S<sub>xq</sub></span> + 2×<span style="color:#60a5fa">S<sub>đáy</sub></span></div>
+                        <div class="formula-badge"><span class="f-purple">V</span> = <span class="f-yellow">S<sub>đáy</sub></span> × <span class="f-pink">h</span></div>
+                    </div>
                 </div>
 
                 <div class="pill-group slide-up" id="hk-tabs" style="justify-content:center">
@@ -369,16 +398,29 @@
                 <div class="grid-sidebar slide-up">
                     <div class="card" style="position:relative;min-height:450px;overflow:hidden">
                         <canvas id="hk-canvas" style="width:100%;height:100%;display:block;cursor:grab"></canvas>
-                        <button class="btn btn-secondary" style="position:absolute;bottom:12px;right:12px;padding:6px 12px;font-size:0.78rem" onclick="ModuleHinhKhoi.resetCamera()">📷 Góc nhìn mặc định</button>
+                        <div style="position:absolute;bottom:12px;right:12px">
+                            <button class="btn btn-secondary" style="padding:5px 10px;font-size:0.72rem" onclick="ModuleHinhKhoi.resetCamera()">📷 Reset</button>
+                        </div>
                     </div>
                     <div class="flex-col">
-                        <div class="card"><h3>📏 Kích thước</h3><div id="hk-sliders"></div></div>
+                        <div class="card">
+                            <h3>📏 Kích thước</h3>
+                            <div style="display:flex;gap:4px;margin-bottom:10px;align-items:center">
+                                <span style="font-size:0.72rem;color:#888;font-weight:600">Đơn vị:</span>
+                                <button class="pill hk-unit-btn" data-unit="mm" onclick="ModuleHinhKhoi.setUnit('mm')" style="padding:4px 12px;font-size:0.75rem">mm</button>
+                                <button class="pill hk-unit-btn active" data-unit="cm" onclick="ModuleHinhKhoi.setUnit('cm')" style="padding:4px 12px;font-size:0.75rem">cm</button>
+                                <button class="pill hk-unit-btn" data-unit="dm" onclick="ModuleHinhKhoi.setUnit('dm')" style="padding:4px 12px;font-size:0.75rem">dm</button>
+                                <button class="pill hk-unit-btn" data-unit="m" onclick="ModuleHinhKhoi.setUnit('m')" style="padding:4px 12px;font-size:0.75rem">m</button>
+                            </div>
+                            <div id="hk-sliders"></div>
+                        </div>
                         <div class="card">
                             <h3>🎬 Dựng hình</h3>
                             <button class="btn btn-primary btn-full" id="hk-btn-build" onclick="ModuleHinhKhoi.startBuild()">▶️ Bắt đầu dựng hình</button>
                             <button class="btn btn-secondary btn-full" style="margin-top:6px" onclick="ModuleHinhKhoi.resetBuild()">🔄 Đặt lại</button>
                             <div class="progress-bar-container"><div class="progress-bar-fill" id="hk-progress"></div></div>
                         </div>
+
                         <div class="card formula-card"><h3>📐 Công thức</h3><div id="hk-formula"></div></div>
                         <div class="card"><h3>💡 Giải thích</h3><div id="hk-explain" style="font-size:0.88rem;color:var(--text-secondary);line-height:1.6"></div></div>
                     </div>
@@ -411,6 +453,7 @@
             buildSliders();
             buildShape(0);
             updateFormula(0);
+            setHighlight('none');
         },
 
         startBuild() {
@@ -437,6 +480,7 @@
             if (buildAnimId) cancelAnimationFrame(buildAnimId);
             isBuilding = false; buildProgress = 0;
             clearLabels();
+            setHighlight('none');
             const pb = document.getElementById('hk-progress');
             if (pb) pb.style.width = '0%';
             const btn = document.getElementById('hk-btn-build');
@@ -461,6 +505,17 @@
                 scene = null;
             }
             camera = null; controls = null;
+        },
+
+        setHighlight(mode) { setHighlight(mode); },
+
+        setUnit(u) {
+            currentUnit = u;
+            document.querySelectorAll('.hk-unit-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.unit === u);
+            });
+            buildShape(buildProgress > 0 ? buildProgress : 0);
+            updateFormula(buildProgress > 0 ? buildProgress : 0);
         }
     };
 
